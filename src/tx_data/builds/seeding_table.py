@@ -3,8 +3,9 @@
 Per-tumour metastatic seeding characterisation. See
 ``catalog/seeding_table.yml``.
 
-Source format: space-separated text (R ``write.table`` default), header row.
-``tumour_id`` flavour auto-detected via ``tx_data.ids.apply_convention_scalar``.
+Source format: tab-separated text (R ``write.table`` with ``sep="\\t"``),
+header row. ``tumour_id`` flavour auto-detected via
+``tx_data.ids.apply_convention_scalar``.
 """
 
 from __future__ import annotations
@@ -29,9 +30,9 @@ _RENAMES = {
 
 def build() -> pl.DataFrame:
     src = resolve_source(TABLE)
-    log(f"read {src} (space-separated)")
+    log(f"read {src} (tab-separated)")
 
-    df = pl.read_csv(src, separator=" ", null_values=["NA", "", "nan"])
+    df = pl.read_csv(src, separator="\t", null_values=["NA", "", "nan"])
 
     missing = [c for c in _RENAMES.keys() if c not in df.columns]
     if missing:

@@ -202,18 +202,17 @@ sources:
 
   seeding_table:
     relative_path: primary_met/tx842_primary_met_seedingTableFull.txt
-    format: ssv
+    format: tsv
     header: true
     received: 2026-09-23
     notes: |
-      Space-separated text (R data.frame written by `write.table`;
-      default sep). Per-tumour seeding characterisation. Source
-      `tumour_id` uses LTX bare-underscore form (`LTX0121_1`); loader
-      auto-detects the flavour via `tx_data.ids`. Six columns:
-      camelCase `seedingClonality`, `seedingPhyletic`,
-      `individualSeedingClonality`, `individualSeedingPhyletic`,
-      `nRegions`. Loader asserts that the two `individual_*` columns
-      split to `n_regions` tokens.
+      Tab-separated text (R `write.table` with `sep="\t"`). Per-tumour
+      seeding characterisation. Source `tumour_id` uses LTX bare-underscore
+      form (`LTX0121_1`); loader auto-detects the flavour via
+      `tx_data.ids`. Six columns: camelCase `seedingClonality`,
+      `seedingPhyletic`, `individualSeedingClonality`,
+      `individualSeedingPhyletic`, `nRegions`. Loader asserts that the
+      two `individual_*` columns split to `n_regions` tokens.
 
   clone_info:
     relative_path: primary_met/tx842_primary_met_cloneInfo.df.txt
