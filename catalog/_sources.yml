@@ -1,0 +1,271 @@
+# _sources.yml
+#
+# Registry of HPC source locations for each canonical table. Build scripts
+# read from here rather than hardcoding paths, so a build can be re-pointed
+# (e.g. from Tx842 to a future Tx900) by editing this one file.
+#
+# Path resolution:
+#   Effective source path = <TX_DATA_SOURCE_ROOT || config/paths.yml source_root> + relative_path
+#   For local development, the mocked equivalent lives in nemo_mock/<relative_path>.
+#
+# Filenames starting with `_` are treated as registry/metadata by catalog.load_all()
+# and are not loaded as table definitions.
+
+cohort:
+  id: Tx842
+  human_name: TRACERx 842
+  source_root_default: /nemo/project/proj-tracerx-lung/tctProjects/lungTx/Tx842/release/tracerx_842
+  # Optional per-table source_root overrides for assets that live outside the
+  # main release tree — resolves to `source_root: <root>` on the table entry.
+
+alt_source_roots:
+  cn_ccf_alphamissense: /nemo/project/proj-tracerx-lung/tctProjects/CN-CCF/alphamissense
+  # Mets RNA-seq release lives alongside the main Tx842 release tree; same
+  # top-level cluster root, different subtree. Kept as a named root so tests
+  # and downstream projects don't hardcode the path.
+  tx842_mets_rnaseq: /nemo/project/proj-tracerx-lung/tctProjects/lungTx/Tx842/release/tx842_mets_rnaseq
+  # Clinical / QC release tree — sits outside the main tracerx_842 release
+  # subtree. Used currently by id_crosswalk; may host more clinical assets.
+  tx842_clinical_qc: /nemo/project/proj-tracerx-lung/tctProjects/lungTx/Tx842/clinical_qc/6_release/cohort
+  # Static hg19 reference files (UCSC downloads). Not cohort-specific.
+  # Override on the HPC once a shared static-refs location is picked;
+  # in the mock and for local dev, resolves to nemo_mock/alt/hg19_reference/.
+  hg19_reference: /nemo/project/proj-tracerx-lung/references/hg19
+
+sources:
+  muttable:
+    relative_path: tx842_mutation_table.tsv.gz
+    format: tsv_gz
+    header: true
+    received: 2026-08-31
+    notes: |
+      Long format, one row per (mutation, sample) pair. Filter by is_present==True
+      for "actually detected in this sample".
+
+  wgd_calls:
+    relative_path: WGD/release_tx842/WGD_calls.tsv
+    format: tsv
+    header: true
+    received: 2026-08-31
+    notes: |
+      Per-clone WGD assignments AND the tumour tree in one file — satisfies
+      both the "PGDD output" and "phylogenetic tree" requirements.
+      Uses tumour_id spelling `LTX0001-Tumour1` (differs from muttable's
+      `LTX0001_tumour1`); loader normalises.
+
+  alphamissense:
+    source_root: cn_ccf_alphamissense                  # from alt_source_roots
+    relative_path_pattern: "output/annotated_muttables/tx842/{tumour_id}_muttable_alpha.tsv"
+    format: tsv                                        # plain TSV, no `##` comment lines, clean header row
+    header: true
+    per_tumour: true
+    per_tumour_layout: flat                            # files sit directly under tx842/ (no per-tumour subdirectory)
+    tumour_id_form: "LTX0001_tumour1"                  # underscore + lowercase; matches muttable, NOT wgd_calls canonical form
+    received: 2026-08-31
+    notes: |
+      One file per tumour. Muttable-shaped TSV with the AlphaMissense
+      columns appended (NOT raw VEP output). The loader reads only:
+        chr, pos, var, alpha_missense, am_class
+      and dedupes to per-(tumour × chr × pos × alt) because the file is
+      long-form (one row per mutation × sample).
+
+      Real column semantics:
+        alpha_missense  — float score in [0, 1]; NA for non-missense.
+        am_class        — raw upstream labels (DeepMind naming):
+                            {ambiguous, Likely benign, Likely pathogenic,
+                             not_classified, NA}
+                          The build step normalises to the canonical
+                          {benign, ambiguous, pathogenic, null} set so
+                          downstream code doesn't need to know about the
+                          naming variants:
+                            Likely benign     → benign
+                            Likely pathogenic → pathogenic
+                            ambiguous         → ambiguous
+                            not_classified    → null
+                            NA / empty        → null
+
+      Layout changed 2026-09-02 (confirmed by User): files were moved
+      into an `output/` subdirectory, the per-tumour subdirectory was
+      flattened, tumour_id spelling in the filename switched from
+      `LTX0001-Tumour1` to `LTX0001_tumour1`, the `_muttable_annotated`
+      suffix became `_muttable_alpha`. Extension `.tsv`, plain tab-separated,
+      clean header row (no `##` comments, no leading `#`). File shape
+      changed from raw VEP → muttable + AM: `Location` / `Allele` /
+      `Consequence` / `Gene` columns no longer exist; the AM score column
+      is `alpha_missense`, renamed to `am_pathogenicity` at build time.
+
+  clinical:
+    relative_path: tx842_clinical.tsv
+    format: tsv
+    header: true
+    null_marker: "NA"
+    received: 2026-08-31
+    notes: |
+      Per-patient. Multi-tumour patients encode two lesions on one row
+      (histology1_ / histology2_); loader unpivots to per-tumour view.
+      Does NOT contain purity, ploidy, TP53 status, mutation signatures, or
+      survival time-to-event columns — those live elsewhere (TBC) or must
+      be derived.
+
+  driver_list:
+    relative_path: drivers/tx842_driver_gene_list.tsv
+    format: tsv
+    header: true
+    null_marker: "NA"
+    received: 2026-09-01
+    notes: |
+      TRACERx-bespoke driver gene list. Recommended filter for SNV analyses
+      is `lung_mut_driver == TRUE`. Contains both hg19 and hg38 coordinates
+      (GENCODE v49). Replaces the earlier plan to use COSMIC CGC directly.
+
+  alpaca:
+    relative_path: ALPACA/output/cohort_results/all_tumours_combined.csv
+    format: csv
+    header: true
+    received: 2026-09-03
+    notes: |
+      Cohort-wide CSV of per-(tumour × segment × clone) allele-specific
+      integer copy numbers from ALPACA. tumour_id and clone forms match
+      wgd_calls directly (canonical `LTX0001-Tumour1`, string `clone1`).
+      Segment field is `<chr>_<start>_<end>` — parsed by the loader.
+
+  clone_proportions:
+    relative_path_pattern: "ALPACA/input/{tumour_id}/cp_table.csv"
+    format: csv
+    header: true
+    per_tumour: true
+    per_tumour_layout: nested        # each tumour has its own `<tumour_id>/` directory
+    tumour_id_form: "LTX0001-Tumour1"   # canonical hyphen + capital T; matches wgd_calls
+    received: 2026-09-09
+    notes: |
+      CONIPHER clone composition table — one CSV per tumour under
+      `ALPACA/input/<tumour_id>/`. Wide layout: N sample columns followed
+      by a trailing `clone` column; values are proportions in [0, 1]. The
+      loader melts to long canonical form and derives tumour_id from the
+      containing directory name.
+
+  kallisto_counts:
+    source_root: tx842_mets_rnaseq
+    relative_path: _aggregate/kallisto_mat/kallisto_counts.parquet
+    format: parquet
+    received: 2026-09-03
+    notes: |
+      Wide-format parquet: one `gene_id` column + N sample columns. Sample
+      column names use the same hashed form as muttable.sample_name_hash.
+      Normal samples contain `_N01`; tumour samples `_T{n}-R{n}`. Combined
+      with `kallisto_tpm` by the builder.
+
+  kallisto_tpm:
+    source_root: tx842_mets_rnaseq
+    relative_path: _aggregate/kallisto_mat/kallisto_tpm.parquet
+    format: parquet
+    received: 2026-09-03
+    notes: |
+      Same shape as `kallisto_counts`; the loader hard-fails if gene and
+      sample sets diverge between the two files.
+
+  id_crosswalk:
+    source_root: tx842_clinical_qc
+    relative_path: 2026-06-08_LTX_CRUK_key.csv
+    format: csv
+    header: true
+    received: 2026-09-23
+    notes: |
+      Patient-level TRACERx identifier crosswalk. Columns on source:
+      `PatientID` (LTX form, e.g. `LTX0192`) and `CRUK_ID` (CRUK form,
+      e.g. `CRUK0090`). One-to-one at patient level. Backs the CRUK ↔ LTX
+      translation used by `tx_data.ids` and by any build that ingests
+      CRUK-keyed sources (currently: clone_info).
+
+  hg19_refgene__refgene:
+    source_root: hg19_reference
+    relative_path: refGene.txt.gz
+    format: tsv_gz
+    header: false
+    received: 2026-09-23
+    notes: |
+      UCSC refGene table for hg19, gzipped, no header. Column order:
+      bin, name, chrom, strand, txStart, txEnd, cdsStart, cdsEnd, exonCount,
+      exonStarts, exonEnds, score, name2, cdsStartStat, cdsEndStat, exonFrames.
+      Consumed together with `hg19_refgene__cytoband` by the `hg19_refgene`
+      builder.
+
+  hg19_refgene__cytoband:
+    source_root: hg19_reference
+    relative_path: cytoBand.txt.gz
+    format: tsv_gz
+    header: false
+    received: 2026-09-23
+    notes: |
+      UCSC cytoBand table for hg19, gzipped, no header. Column order:
+      chrom, chromStart, chromEnd, band_name (e.g. `p36.33`), gie_stain.
+
+  seeding_table:
+    relative_path: primary_met/tx842_primary_met_seedingTableFull.txt
+    format: ssv
+    header: true
+    received: 2026-09-23
+    notes: |
+      Space-separated text (R data.frame written by `write.table`;
+      default sep). Per-tumour seeding characterisation. Source
+      `tumour_id` uses LTX bare-underscore form (`LTX0121_1`); loader
+      auto-detects the flavour via `tx_data.ids`. Six columns:
+      camelCase `seedingClonality`, `seedingPhyletic`,
+      `individualSeedingClonality`, `individualSeedingPhyletic`,
+      `nRegions`. Loader asserts that the two `individual_*` columns
+      split to `n_regions` tokens.
+
+  clone_info:
+    relative_path: tx842_primary_met_cloneInfo.df.txt
+    format: tsv
+    header: true
+    received: 2026-09-23
+    notes: |
+      Tab-separated text (R data.frame written by `write.table`). Source
+      `tumour_id` uses the LTX prefix but WITHOUT a `Tumour`/`Cluster` word
+      — bare underscore + integer, e.g. `LTX0121_1`. The build script uses
+      `tx_data.ids.apply_convention_scalar` to auto-detect the flavour;
+      any of LTX-Tumour / LTX_tumour / LTX_N / LTX-Cluster / CRUK_N /
+      CRUK-Cluster / CRUK-Tumour is accepted. `mutation_cluster` is
+      snake_case; the classification columns are camelCase (`treeClones`,
+      `seedingClones`, etc.). All rows are preserved — `treeClones == FALSE`
+      clusters are real mutations that CONIPHER did not fit on the tree
+      and are kept for downstream analyses that want them.
+
+  purity_ploidy:
+    relative_path: tx842_purity_ploidy.csv
+    format: csv
+    header: true
+    received: 2026-10-20
+    received_via: User (Discord) supplied Nemo path + 2-row head
+    notes: |
+      Per-region (sample) purity and ploidy estimates. Three columns on
+      source: `sample_name_hash`, `purity`, `ploidy`. The hash follows the
+      same convention as `muttable.sample_name_hash` and the kallisto
+      sample columns (`LTX0001_SU_T1-R1--6ecf51f11b1b`), so the build
+      script can parse (patient, tumour_ordinal, region) back out and
+      derive canonical `tumour_id`.
+
+  conipher_trees:
+    relative_path: tx842_trees.RDS                     # resolves against source_root_default
+    format: rds                                        # R-native serialized object; loader uses R subprocess
+    header: false
+    received: 2026-10-15
+    received_via: User (Discord) supplied Nemo path
+    notes: |
+      Single cohort-wide RDS bundle produced by CONIPHER post-processing.
+      Expected (TBC — Nemo probe pending) to be a named list keyed by
+      tumour_id, each element carrying at least:
+        $nested_pyclone$ccf_cluster_table
+        $clonality_out$clonality_table_corrected
+      which `DRIVERORDERING_run_btm.R` reads to compute per-clone CCF
+      metrics for the BTM step (Main Fig 4 b/c + ED Fig 6 BTM panels).
+
+      Canonicalisation plan (deferred until probe confirms structure):
+      - Emit two long parquets, `conipher_ccf.parquet` (tumour_id, clone,
+        region, ccf) and `conipher_clonality.parquet` (tumour_id, clone,
+        region, label ∈ {clonal, subclonal}).
+      - Downstream adapter in `tx800_alpaca_replica/scripts/prep/` writes
+        the per-tumour `<tumour_id>_trees.rds` files the paper's R script
+        expects.
+

@@ -1,0 +1,217 @@
+name: wgd_calls
+description: |
+  Per-clone whole-genome-doubling calls integrated across multiple internal
+  tools including ParallelGDDetect (PGDD). One row per (tumour × clone).
+
+  This table carries TWO distinct pieces of information in one file:
+
+  1. **WGD assignments** — for each clone, how many genome-doubling events
+     are placed on the branch leading to that clone (`number_of_gds_at_clone`),
+     plus tumour-level rollups (`total_gds_per_tumour`) and the top-level
+     classification (`class`).
+
+  2. **Phylogenetic tree structure** — the `parent` column implicitly defines
+     the tumour's clone tree (one parent per clone; root has parent = 'diploid').
+     Combined with the row per clone, this IS the parent-child edge list per
+     tumour; no separate tree file needed.
+
+  Together these are enough to label any mutation (via its `clone`
+  in muttable) as pre-WGD, post-WGD, no-WGD, or off-lineage relative to any
+  WGD event(s) in its tumour.
+
+provenance:
+  cohort: TRACERx 842 (Tx842)
+  hpc_source: /nemo/project/proj-tracerx-lung/tctProjects/lungTx/Tx842/release/tracerx_842/WGD/release_tx842/WGD_calls.tsv
+  format_on_source: TSV, header row (no gzip)
+  received: 2026-08-31
+  received_via: 9-row head sent by User for cataloguing
+  canonical_format: Parquet (after build script)
+  pipeline: integrates ParallelGDDetect (Frankell 2023) with in-house tools
+
+primary_key:
+  - tumour_id
+  - clone
+
+grain: one row per (tumour × clone)
+
+genome_build: hg19    # matches muttable and other Tx842 assets
+
+joins:
+  # After the tx_data v2 canonicalisation pass every per-tumour table uses the
+  # same column names, so joins are trivial.
+  muttable:
+    on:
+      - "wgd_calls.tumour_id = muttable.tumour_id"
+      - "wgd_calls.clone = muttable.clone"
+
+id_normalisation:
+  # Canonical schema shared across ALL tx_data tables (applied at build time).
+  tumour_id:
+    canonical: "LTX0001-Tumour1"        # hyphen + capital T; String
+    source_coercions:
+      - "muttable.patient_tumour ('LTX0001_tumour1') → tumour_id"
+      - "muttable.tumour_id (integer ordinal) → tumour_ordinal"
+  clone:
+    canonical: "clone1"                 # string with 'clone' prefix
+    source_coercions:
+      - "muttable.mutation_cluster (float 1.0) → clone ('clone1'); NaN → NULL"
+  alt:
+    canonical: "alt"                    # matches alphamissense.alt
+    source_coercions:
+      - "muttable.var → alt"
+  chr:
+    canonical: "no `chr` prefix"        # '17', 'X', 'MT'; String
+    source_coercions:
+      - "any 'chrN' → 'N'; 'M' → 'MT'"
+      - applied_to:
+        - muttable.chr
+        - alphamissense.chr
+        - alpaca.segment_chr
+        - driver_list.chr_hg19
+        - driver_list.chr_hg38
+
+filters_of_interest:
+  # HARD FILTER for any downstream analysis: only `resolved` tumours are
+  # analytically usable. Unresolved / needs_follow_up rows must be dropped.
+  analysis_usable: "status == 'resolved'"
+  high_quality: "quality == 'High'"          # advisory, not a hard filter
+  clonal_wgd_tumours: "class == 'clonal_wgd'"
+  subclonal_wgd_mut_supported: "class == 'mut_supported'"    # subclonal WGD, PGDD-mutation-supported
+  subclonal_wgd_ploidy_only: "class == 'ploidy_only'"        # subclonal WGD, CN-only placement (weaker)
+  no_wgd_tumours: "class == 'no_wgd'"
+
+derived_columns:
+  # Not in source; computed by the loader for convenience.
+  - name: is_root
+    description: "TRUE when parent == 'diploid'. The MRCA clone."
+    rule: "parent == 'diploid'"
+  - name: is_wgd_event_clone
+    description: "TRUE when at least one WGD event is placed on the branch INTO this clone."
+    rule: "number_of_gds_at_clone > 0"
+  - name: cumulative_gds_to_clone
+    description: |
+      Sum of `number_of_gds_at_clone` along the parent chain from this clone
+      back to the MRCA (inclusive of self). = "how many WGDs happened in this
+      clone's lineage from diploid up to and including this clone".
+    rule: "sum(number_of_gds_at_clone for clone in ancestors(self) + [self])"
+  - name: has_wgd_ancestor
+    description: |
+      TRUE when this clone OR any ancestor has a WGD event.
+      = cumulative_gds_to_clone > 0.
+      This is the per-clone label driving pre/post-WGD stratification of
+      mutations. Post-WGD mutations = mutations in clones where
+      has_wgd_ancestor is TRUE.
+    rule: "cumulative_gds_to_clone > 0"
+
+columns:
+  - name: tumour_id
+    type: VARCHAR
+    description: |
+      Canonical per-tumour identifier, e.g. `LTX0001-Tumour1`. Shared across
+      every tx_data per-tumour table (see id_normalisation).
+    null_semantics: not_applicable
+
+  - name: clone
+    type: VARCHAR
+    description: |
+      Clone / CONIPHER cluster ID, e.g. `clone1`, `clone2`, ..., `clone10`.
+      Canonical name across muttable, alpaca, wgd_calls, and clone_proportions.
+    null_semantics: not_applicable
+
+  - name: parent
+    type: VARCHAR
+    description: |
+      Parent clone in the tumour phylogeny. String `diploid` for the root
+      clone (the virtual diploid ancestor). Otherwise a `clone{N}` string
+      matching another row's `clone` value in the same tumour.
+      Together with the row list per tumour, this IS the parent-child
+      edge table for the phylogeny.
+    null_semantics: not_applicable
+    special_values:
+      - "diploid: virtual root, indicates this clone is the trunk / MRCA-level clone"
+
+  - name: number_of_gds_at_clone
+    type: INTEGER
+    description: |
+      Number of whole-genome-doubling events placed on the branch INTO this
+      clone. Can be > 1 — e.g. value 2 at the MRCA means two clonal WGDs at
+      the same location. Sum across all clones of a tumour = total_gds_per_tumour.
+
+      To determine how many WGDs occurred UP TO clone X (i.e. in X's ancestry
+      including X itself), sum `number_of_gds_at_clone` along the parent chain
+      from X back to the MRCA. Computed by the loader as `cumulative_gds_to_clone`
+      (see derived_columns).
+    null_semantics: not_applicable
+
+  - name: total_gds_per_tumour
+    type: INTEGER
+    description: |
+      Total number of WGD events in this tumour, summed across all clones.
+      Constant across all rows sharing the same tumour_id.
+      Example: 1 clonal WGD + 2 parallel subclonal WGDs → total = 3.
+      Value 0 = tumour has no WGD anywhere.
+    null_semantics: not_applicable
+
+  - name: quality
+    type: VARCHAR
+    description: |
+      WGD-call quality tier. Currently {'High', 'Low'} but the value set may
+      grow. **'Low' calls are still analytically acceptable** — this flag is
+      an advisory to help spot suspicious cases, not a hard filter.
+    allowed_values: [High, Low]
+    null_semantics: unknown
+
+  - name: status
+    type: VARCHAR
+    description: |
+      Status of the WGD placement. **HARD FILTER:** only `resolved` rows are
+      usable in any downstream analysis. Unresolved and needs_follow_up rows
+      must be excluded.
+    allowed_values: [resolved, unresolved, needs_follow_up]
+    null_semantics: unknown
+    notes: "This is the mandatory analytical filter for this table."
+
+  - name: class
+    type: VARCHAR
+    description: |
+      Top-level WGD classification for the whole TUMOUR (constant across all
+      clones of the same tumour_id). Values:
+        - 'clonal_wgd'    : one or more clonal WGDs, no subclonal WGDs
+        - 'mut_supported' : ≥1 subclonal WGD, supported by mutations (PGDD)
+        - 'ploidy_only'   : ≥1 subclonal WGD, placement inferred from copy
+                            number ONLY (no mutation support) — weaker call,
+                            downstream pre/post-WGD labelling less reliable
+        - 'no_wgd'        : no doubling detected anywhere in the tumour
+        - NaN             : tumour not yet resolved — filter out via `status`
+    allowed_values: [clonal_wgd, mut_supported, ploidy_only, no_wgd]
+    null_semantics: unknown   # NaN = unresolved
+    notes: "NaN rows should already be excluded by the `status == 'resolved'` filter."
+
+  - name: sub_class
+    type: VARCHAR
+    description: |
+      WGD-pattern refinement for the whole TUMOUR. Values:
+        - 'parallel only'        : subclonal WGDs occur only on parallel branches
+        - 'sequential only'      : all WGDs sit on a single path from MRCA to a leaf
+        - 'parallel + sequential': mixed pattern
+        - 'single subclonal GD'  : exactly one subclonal WGD, no parallelism
+        - NaN                    : tumour is unresolved OR class is 'clonal_wgd' /
+                                   'no_wgd' (no subclonal pattern to describe)
+    allowed_values: ["parallel only", "sequential only", "parallel + sequential", "single subclonal GD"]
+    null_semantics: not_applicable    # NaN is expected for clonal_wgd / no_wgd / unresolved
+
+relationships:
+  - column: tumour_id
+    references: tumours.tumour_id            # TBC — canonical after normalisation
+  - column: [tumour_id, clone]
+    references: [muttable.tumour_id, muttable.clone]                  # canonical
+  - column: [tumour_id, parent]
+    references: [wgd_calls.tumour_id, wgd_calls.clone]                # self-reference for tree
+
+scope_notes: |
+  Grain is per-tumour, not per-patient. Multi-tumour patients (LTX0001-Tumour1,
+  LTX0001-Tumour2) each get their own tree + WGD calls. Do not aggregate at
+  patient level without an explicit rule.
+
+open_questions:
+  - "Are there tumours in the cohort that have NO row in this file at all (WGD calling didn't run vs ran and found none)? no_wgd tumours DO get rows with class='no_wgd', so the ambiguity is only for tumours that appear in muttable but not here."

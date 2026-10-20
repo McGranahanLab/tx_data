@@ -1,0 +1,117 @@
+name: clone_proportions
+description: |
+  CONIPHER-derived per-sample clone composition for each tumour. Every row is
+  a (tumour × clone × sample) triple: the proportion of `sample` that is
+  composed of `clone` in that tumour's subclonal reconstruction.
+
+  This table is emitted by CONIPHER and consumed by ALPACA as input; the
+  canonical release ships it as one CSV per tumour under
+  `ALPACA/input/<tumour_id>/cp_table.csv`.
+
+  Downstream analyses (e.g. lof_gene subclonal LoF calls) use it to decide
+  which clones are actually detectable in the tumour and at what magnitude —
+  the standard rule is that a clone is "present" if it reaches at least the
+  configured `subclonal_presence_threshold` in ANY sample of the tumour.
+
+provenance:
+  cohort: TRACERx 842 (Tx842)
+  hpc_source_pattern: /nemo/project/proj-tracerx-lung/tctProjects/lungTx/Tx842/release/tracerx_842/ALPACA/input/<tumour_id>/cp_table.csv
+  format_on_source: comma-separated CSV, one file per tumour, header row
+  received: 2026-09-09
+  received_via: single-tumour example (LTX0001-Tumour1) sent by User
+  canonical_format: Parquet (after build script) — long form
+  pipeline: |
+    CONIPHER outputs per-sample clone composition alongside its tree; the
+    same file is fed into ALPACA as input. tumour_id in the source path is
+    the canonical form `LTX0001-Tumour1` (hyphen + capital T).
+
+source_shape: |
+  Source CSV is WIDE: N sample columns followed by a trailing `clone`
+  column. Sample column names carry the full TRACERx sample id including a
+  trailing hash, e.g. `LTX0001_SU_T1-R1--6ecf51f11b1b`. Values are
+  proportions in [0, 1] and sum to ~1 down each sample column. Zero rows
+  are common — every clone in the tumour's tree appears whether or not it
+  was detected in any sample.
+
+  The loader melts to LONG canonical form `(tumour_id, clone, sample_id,
+  proportion)`; the trailing hash on the sample id is preserved verbatim.
+
+primary_key:
+  - tumour_id
+  - clone
+  - sample_id
+
+grain: one row per (tumour × clone × sample)
+
+joins:
+  wgd_calls:
+    on:
+      - "clone_proportions.tumour_id = wgd_calls.tumour_id"
+      - "clone_proportions.clone = wgd_calls.clone"
+    notes: |
+      Both sides use canonical `LTX0001-Tumour1` / `clone1` forms. Direct
+      join, no coercion.
+  alpaca:
+    on:
+      - "clone_proportions.tumour_id = alpaca.tumour_id"
+      - "clone_proportions.clone = alpaca.clone"
+    notes: |
+      cp_table.csv is ALPACA's input; the tree and clone set match exactly.
+
+filters_of_interest:
+  present_in_any_sample: "max_by(sample_id)(proportion) >= <threshold>"
+  # Parameter, not a hard filter — analyses set their own threshold (e.g.
+  # lof_gene defaults to 0.05).
+
+derived_columns: []   # kept raw; downstream computes max-per-clone as needed
+
+columns:
+  - name: tumour_id
+    type: VARCHAR
+    description: |
+      Canonical tumour identifier `LTX0001-Tumour1` (hyphen + capital T),
+      matching wgd_calls and ALPACA. Derived from the source directory
+      name at build time.
+    null_semantics: not_applicable
+
+  - name: clone
+    type: VARCHAR
+    description: |
+      Clone / CONIPHER cluster id, e.g. `clone1`, `clone2`, ..., matching
+      wgd_calls.clone directly.
+    null_semantics: not_applicable
+
+  - name: sample_id
+    type: VARCHAR
+    description: |
+      Full TRACERx sample id including the trailing hash, verbatim from the
+      source CSV header, e.g. `LTX0001_SU_T1-R1--6ecf51f11b1b`. Uses the
+      underscore/capital-T tumour spelling `LTX0001_SU_T1`, distinct from
+      the canonical `LTX0001-Tumour1` used in `tumour_id`. Kept as-is to
+      allow direct string joins against upstream sample-hashed identifiers
+      elsewhere in the release.
+    null_semantics: not_applicable
+
+  - name: proportion
+    type: DOUBLE
+    description: |
+      Fraction of `sample_id` composed of `clone` in the tumour's subclonal
+      reconstruction; nominal range `[0, 1]`. Sums to ~1 across all clones
+      within a fixed sample. Explicit zeros are common and meaningful:
+      "this clone was expected on the tree but not detected in this
+      sample".
+    null_semantics: not_measured
+
+relationships:
+  - column: tumour_id
+    references: wgd_calls.tumour_id
+  - column: [tumour_id, clone]
+    references: [wgd_calls.tumour_id, wgd_calls.clone]
+
+scope_notes: |
+  Grain is per-tumour, not per-patient. Multi-tumour patients get separate
+  cp_table.csv files under distinct `<tumour_id>` directories.
+
+open_questions:
+  - "Are all clones in wgd_calls guaranteed to appear here, and vice versa? Real Tx842 check pending."
+  - "Do all sample columns in cp_table.csv have matching kallisto/muttable sample IDs (same hash)? Assumed yes; verify on real data."

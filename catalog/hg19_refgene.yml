@@ -1,0 +1,86 @@
+name: hg19_refgene
+description: |
+  Full hg19 gene annotation table — one row per (gene × chromosome),
+  with genomic interval and cytoband. Built from UCSC ``refGene.txt.gz``
+  and ``cytoBand.txt.gz``. Provides the *background gene set* that
+  paper-derived pipelines (``compute_gene_seg_mapping.R``,
+  ``DRIVERORDERING_callevents.R``, ``SEEDING_compare_cloneclass_events.R``)
+  use to overlap CN segments before filtering to drivers.
+
+  Complements ``driver_list`` — that table is drivers only; this one is
+  the whole genome. Adapters that need the paper's
+  ``hg19refgene_tx421driveranno.csv`` shape join
+  ``hg19_refgene ⨝ driver_list`` on ``gene_name = Hugo_Symbol`` and fill
+  missing driver flags with FALSE.
+
+provenance:
+  cohort: n/a — static reference data, hg19 build.
+  hpc_source: |
+    Downloaded from UCSC:
+      http://hgdownload.soe.ucsc.edu/goldenPath/hg19/database/refGene.txt.gz
+      http://hgdownload.soe.ucsc.edu/goldenPath/hg19/database/cytoBand.txt.gz
+    Cached under the ``hg19_reference`` alt_source_root.
+  format_on_source: tab-separated, no header row; UCSC schema.
+  received: 2026-09-23
+  received_via: User-approved fetch (Discord)
+  canonical_format: Parquet (after build script)
+  source_root_alias: hg19_reference
+  reference_build: hg19
+
+primary_key:
+  - gene_name
+  - chromosome
+
+grain: one row per (gene, chromosome). A tiny number of genes appear on more than one chromosome (pseudogenes, X/Y homologs); those emit multiple rows so downstream code can detect and exclude them (matches paper `load_gene_anno` behaviour).
+
+genome_build: hg19
+chr_prefix: false      # chr values are stripped ("17", "X", "MT"), matching muttable / alpaca / driver_list
+
+columns:
+  - name: gene_name
+    type: VARCHAR
+    description: HGNC gene symbol (UCSC refGene `name2`). Joins to `driver_list.Hugo_Symbol`.
+    null_semantics: not_applicable
+  - name: chromosome
+    type: VARCHAR
+    description: Chromosome, no `chr` prefix. Includes 1–22, X, Y, M (mitochondrial, if present).
+    null_semantics: not_applicable
+  - name: start
+    type: INTEGER
+    description: Minimum txStart across all refGene transcripts of this gene on this chromosome. 0-based, matches UCSC BED convention.
+    null_semantics: not_applicable
+  - name: end
+    type: INTEGER
+    description: Maximum txEnd across all refGene transcripts of this gene on this chromosome. Half-open interval [start, end).
+    null_semantics: not_applicable
+  - name: strand
+    type: VARCHAR
+    description: |
+      Either `+` or `-`. Taken from the first transcript row for the
+      (gene, chromosome) group; refGene transcripts on the same chromosome
+      for a gene are almost always same-strand.
+    null_semantics: not_applicable
+  - name: cytoband_name
+    type: VARCHAR
+    description: |
+      Cytobands overlapping the gene interval, semicolon-joined in
+      ascending order (e.g. `p13.1;p13.2`). Empty string if no cytoBand
+      match (should be extremely rare — typically only for genes on
+      alternate haplotype chromosomes, which are filtered).
+    null_semantics: not_applicable
+
+joins:
+  driver_list:
+    on:
+      - "hg19_refgene.gene_name = driver_list.Hugo_Symbol"
+    notes: |
+      Left-join hg19_refgene to driver_list; unmatched rows are non-drivers,
+      so downstream code fills is_cn_driver / is_lung_mut_driver /
+      is_pancan_mut_driver etc. with FALSE.
+
+  alpaca:
+    on:
+      - "hg19_refgene.chromosome = split_part(alpaca.segment, '_', 1)"
+    notes: |
+      Segment-to-gene overlap is done in-code (start/end BETWEEN);
+      the join here is a helper.

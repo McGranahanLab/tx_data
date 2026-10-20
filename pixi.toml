@@ -1,0 +1,24 @@
+[workspace]
+name = "tx_data"
+version = "0.0.1"
+description = "Semantic data layer for TRACERx cohort analysis"
+channels = ["conda-forge"]
+platforms = ["linux-64", "osx-arm64", "osx-64"]
+
+[dependencies]
+python = "3.11.*"
+polars = ">=1.0"
+pyarrow = ">=15.0"
+pyyaml = ">=6.0"
+pytest = ">=8.0"
+
+[pypi-dependencies]
+tx_data = { path = ".", editable = true }
+pyliftover = ">=0.4"
+
+[tasks]
+mocks    = "python scripts/generate_mocks.py"
+build    = "python scripts/build_all.py"
+test     = "pytest tests/ -q"
+liftover = "python scripts/liftover_muttable.py"
+all      = { depends-on = ["mocks", "build", "test"] }

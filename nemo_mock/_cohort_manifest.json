@@ -1,0 +1,323 @@
+{
+  "schema_version": 1,
+  "cohort_tag": "Tx842_mock",
+  "random_seed": 20260831,
+  "tumours": [
+    {
+      "patient_id": "LTX0001",
+      "tumour_ordinal": 1,
+      "tumour_id_canonical": "LTX0001-Tumour1",
+      "tumour_id_muttable": "LTX0001_tumour1",
+      "status": "resolved",
+      "histology_group": "LUAD",
+      "n_samples": 3,
+      "clones": [
+        {
+          "name": "clone1",
+          "parent": "diploid",
+          "gds_at_clone": 0
+        },
+        {
+          "name": "clone2",
+          "parent": "clone1",
+          "gds_at_clone": 0
+        },
+        {
+          "name": "clone3",
+          "parent": "clone2",
+          "gds_at_clone": 0
+        }
+      ]
+    },
+    {
+      "patient_id": "LTX0002",
+      "tumour_ordinal": 1,
+      "tumour_id_canonical": "LTX0002-Tumour1",
+      "tumour_id_muttable": "LTX0002_tumour1",
+      "status": "resolved",
+      "histology_group": "LUAD",
+      "n_samples": 3,
+      "clones": [
+        {
+          "name": "clone1",
+          "parent": "diploid",
+          "gds_at_clone": 1
+        },
+        {
+          "name": "clone2",
+          "parent": "clone1",
+          "gds_at_clone": 0
+        },
+        {
+          "name": "clone3",
+          "parent": "clone2",
+          "gds_at_clone": 0
+        },
+        {
+          "name": "clone4",
+          "parent": "clone3",
+          "gds_at_clone": 0
+        }
+      ]
+    },
+    {
+      "patient_id": "LTX0003",
+      "tumour_ordinal": 1,
+      "tumour_id_canonical": "LTX0003-Tumour1",
+      "tumour_id_muttable": "LTX0003_tumour1",
+      "status": "resolved",
+      "histology_group": "LUSC",
+      "n_samples": 2,
+      "clones": [
+        {
+          "name": "clone1",
+          "parent": "diploid",
+          "gds_at_clone": 1
+        },
+        {
+          "name": "clone2",
+          "parent": "clone1",
+          "gds_at_clone": 0
+        },
+        {
+          "name": "clone3",
+          "parent": "clone2",
+          "gds_at_clone": 0
+        }
+      ]
+    },
+    {
+      "patient_id": "LTX0004",
+      "tumour_ordinal": 1,
+      "tumour_id_canonical": "LTX0004-Tumour1",
+      "tumour_id_muttable": "LTX0004_tumour1",
+      "status": "resolved",
+      "histology_group": "LUAD",
+      "n_samples": 4,
+      "clones": [
+        {
+          "name": "clone1",
+          "parent": "diploid",
+          "gds_at_clone": 0
+        },
+        {
+          "name": "clone2",
+          "parent": "clone1",
+          "gds_at_clone": 0
+        },
+        {
+          "name": "clone3",
+          "parent": "clone1",
+          "gds_at_clone": 0
+        },
+        {
+          "name": "clone4",
+          "parent": "clone2",
+          "gds_at_clone": 1
+        },
+        {
+          "name": "clone5",
+          "parent": "clone3",
+          "gds_at_clone": 0
+        }
+      ]
+    },
+    {
+      "patient_id": "LTX0005",
+      "tumour_ordinal": 1,
+      "tumour_id_canonical": "LTX0005-Tumour1",
+      "tumour_id_muttable": "LTX0005_tumour1",
+      "status": "resolved",
+      "histology_group": "LUAD",
+      "n_samples": 4,
+      "clones": [
+        {
+          "name": "clone1",
+          "parent": "diploid",
+          "gds_at_clone": 0
+        },
+        {
+          "name": "clone2",
+          "parent": "clone1",
+          "gds_at_clone": 0
+        },
+        {
+          "name": "clone3",
+          "parent": "clone1",
+          "gds_at_clone": 0
+        },
+        {
+          "name": "clone4",
+          "parent": "clone2",
+          "gds_at_clone": 1
+        },
+        {
+          "name": "clone5",
+          "parent": "clone3",
+          "gds_at_clone": 1
+        }
+      ]
+    },
+    {
+      "patient_id": "LTX0006",
+      "tumour_ordinal": 1,
+      "tumour_id_canonical": "LTX0006-Tumour1",
+      "tumour_id_muttable": "LTX0006_tumour1",
+      "status": "resolved",
+      "histology_group": "LUAD",
+      "n_samples": 3,
+      "clones": [
+        {
+          "name": "clone1",
+          "parent": "diploid",
+          "gds_at_clone": 0
+        },
+        {
+          "name": "clone2",
+          "parent": "clone1",
+          "gds_at_clone": 1
+        },
+        {
+          "name": "clone3",
+          "parent": "clone2",
+          "gds_at_clone": 1
+        },
+        {
+          "name": "clone4",
+          "parent": "clone3",
+          "gds_at_clone": 0
+        }
+      ]
+    },
+    {
+      "patient_id": "LTX0007",
+      "tumour_ordinal": 1,
+      "tumour_id_canonical": "LTX0007-Tumour1",
+      "tumour_id_muttable": "LTX0007_tumour1",
+      "status": "resolved",
+      "histology_group": "LUAD",
+      "n_samples": 3,
+      "clones": [
+        {
+          "name": "clone1",
+          "parent": "diploid",
+          "gds_at_clone": 0
+        },
+        {
+          "name": "clone2",
+          "parent": "clone1",
+          "gds_at_clone": 0
+        },
+        {
+          "name": "clone3",
+          "parent": "clone1",
+          "gds_at_clone": 0
+        },
+        {
+          "name": "clone4",
+          "parent": "clone2",
+          "gds_at_clone": 1
+        },
+        {
+          "name": "clone5",
+          "parent": "clone3",
+          "gds_at_clone": 0
+        }
+      ]
+    },
+    {
+      "patient_id": "LTX0008",
+      "tumour_ordinal": 1,
+      "tumour_id_canonical": "LTX0008-Tumour1",
+      "tumour_id_muttable": "LTX0008_tumour1",
+      "status": "resolved",
+      "histology_group": "LUAD",
+      "n_samples": 2,
+      "clones": [
+        {
+          "name": "clone1",
+          "parent": "diploid",
+          "gds_at_clone": 1
+        },
+        {
+          "name": "clone2",
+          "parent": "clone1",
+          "gds_at_clone": 0
+        },
+        {
+          "name": "clone3",
+          "parent": "clone2",
+          "gds_at_clone": 0
+        }
+      ]
+    },
+    {
+      "patient_id": "LTX0008",
+      "tumour_ordinal": 2,
+      "tumour_id_canonical": "LTX0008-Tumour2",
+      "tumour_id_muttable": "LTX0008_tumour2",
+      "status": "resolved",
+      "histology_group": "LUSC",
+      "n_samples": 2,
+      "clones": [
+        {
+          "name": "clone1",
+          "parent": "diploid",
+          "gds_at_clone": 0
+        },
+        {
+          "name": "clone2",
+          "parent": "clone1",
+          "gds_at_clone": 0
+        }
+      ]
+    },
+    {
+      "patient_id": "LTX0009",
+      "tumour_ordinal": 1,
+      "tumour_id_canonical": "LTX0009-Tumour1",
+      "tumour_id_muttable": "LTX0009_tumour1",
+      "status": "unresolved",
+      "histology_group": "other",
+      "n_samples": 2,
+      "clones": [
+        {
+          "name": "clone1",
+          "parent": "diploid",
+          "gds_at_clone": 0
+        },
+        {
+          "name": "clone2",
+          "parent": "clone1",
+          "gds_at_clone": 0
+        }
+      ]
+    },
+    {
+      "patient_id": "LTX0010",
+      "tumour_ordinal": 1,
+      "tumour_id_canonical": "LTX0010-Tumour1",
+      "tumour_id_muttable": "LTX0010_tumour1",
+      "status": "needs_follow_up",
+      "histology_group": "LUAD",
+      "n_samples": 2,
+      "clones": [
+        {
+          "name": "clone1",
+          "parent": "diploid",
+          "gds_at_clone": 2
+        },
+        {
+          "name": "clone2",
+          "parent": "clone1",
+          "gds_at_clone": 0
+        },
+        {
+          "name": "clone3",
+          "parent": "clone2",
+          "gds_at_clone": 0
+        }
+      ]
+    }
+  ]
+}

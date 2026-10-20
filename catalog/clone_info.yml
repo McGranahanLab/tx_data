@@ -1,0 +1,125 @@
+name: clone_info
+description: |
+  Per (tumour × clone) classification flags derived from the CONIPHER +
+  seeding-classification pipeline used by the ALPACA paper. Each row tells
+  us whether a given clone survived tree building, whether it is a seeding
+  clone, whether it is clonal in its tumour, and whether it appears in
+  primary vs metastatic samples.
+
+  Consumed downstream by the paper's figure scripts (``DRIVERORDERING_run_btm.R``,
+  ``SEEDING_*``, ``COEVOLUTION_*``, ``SURVIVAL_scnaith_diversity_pipeline.R``,
+  ``Fig5b.ipynb``) under the filename ``cloneInfo_df.csv``. Adapters in
+  downstream projects (e.g. ``tx800_alpaca_replica``) rename tx_data
+  canonical columns back to the paper's expected names
+  (``seedingClones``, ``PyCloneCluster_SC``, ``SampleID``).
+
+provenance:
+  cohort: TRACERx 842 (Tx842)
+  hpc_source: /nemo/project/proj-tracerx-lung/tctProjects/lungTx/Tx842/release/tracerx_842/tx842_primary_met_cloneInfo.df.txt
+  format_on_source: tab-separated text (R data.frame written by ``write.table``); header row
+  received: 2026-09-23
+  received_via: User (Discord) supplied permanent path + head + column-naming caveats
+  canonical_format: Parquet (after build script)
+  identifier_system: |
+    Source uses LTX prefix with a bare underscore suffix (``LTX0121_1``) —
+    a distinct flavour from wgd_calls (``LTX0121-Tumour1``) or muttable
+    (``LTX0121_tumour1``). The loader delegates parsing to
+    ``tx_data.ids.parse_tumour_id`` which accepts any of the known
+    variants (LTX-Tumour, LTX_tumour, LTX_N, LTX-Cluster, CRUK_N,
+    CRUK-Cluster, CRUK-Tumour), then emits the form dictated by
+    ``id_convention``.
+  column_naming: |
+    Mixed case in the source header — ``mutation_cluster`` is snake_case,
+    the classification flags (``treeClones``, ``seedingClones``, etc.) are
+    camelCase. The loader renames them all to tx_data canonical
+    snake_case at build time.
+
+primary_key:
+  - tumour_id
+  - clone
+
+grain: one row per (tumour × clone)
+
+column_renames:
+  # Applied by the loader — everything downstream references canonical names.
+  mutation_cluster: clone           # cloneN string (matches muttable / wgd_calls / alpaca)
+  treeClones: is_tree_clone
+  seedingClones: is_seeding_clone
+  clonalClones: is_clonal
+  sharedClones: is_shared
+  primaryClones: is_primary_clone
+  metClones: is_met_clone
+
+value_normalisation:
+  tumour_id: |
+    Source uses CRUK form (``CRUK0090_1`` / ``CRUK0704-Cluster2_1``). The
+    loader parses either form and emits **one** tumour_id column in the
+    form dictated by the global ``id_convention`` (default LTX
+    ``LTX0192-Tumour1``). No CRUK-companion column is stored — downstream
+    code that needs the other form uses ``tx_data.ids.cruk_to_ltx`` /
+    ``ltx_to_cruk`` (which read the ``id_crosswalk`` table). This is the
+    project-wide invariant: no table other than ``id_crosswalk`` carries
+    both ID forms simultaneously.
+  clone: |
+    Source integer (``1``, ``2``, ``3``, ...) is coerced to canonical string
+    ``clone1``, ``clone2``, ... matching muttable / wgd_calls / alpaca.
+
+filters_applied_at_build:
+  - "None. All rows are preserved. ``is_tree_clone == FALSE`` clusters are real mutations CONIPHER did not fit onto the tumour tree; specific analyses filter them out locally as needed (per User 2026-09-23)."
+
+invariants:
+  - "(tumour_id, clone) is unique after build; loader raises if duplicates encountered."
+  - "No CRUK-companion column: exactly one tumour_id per row, in the configured convention."
+  - "Every distinct tumour_id in this table must appear in the ``alpaca`` table (join integrity check — deferred to a test)."
+
+columns:
+  - name: tumour_id
+    type: VARCHAR
+    description: Canonical tumour identifier in the configured ``id_convention`` form (default LTX ``LTX0001-Tumour1``).
+    null_semantics: not_applicable
+  - name: clone
+    type: VARCHAR
+    description: Canonical clone identifier (``clone1``, ``clone2``, ...). Joins to muttable.clone / wgd_calls.clone / alpaca.clone.
+    null_semantics: not_applicable
+  - name: is_tree_clone
+    type: BOOLEAN
+    description: |
+      TRUE if CONIPHER kept this cluster in the tumour tree. FALSE clones
+      are real mutation clusters that did not fit on the tree; some
+      downstream analyses drop them, some keep them — this table stays
+      neutral.
+    null_semantics: not_applicable
+  - name: is_seeding_clone
+    type: BOOLEAN
+    description: TRUE if the clone was classified as a seeder of a metastatic sample.
+    null_semantics: not_applicable
+  - name: is_clonal
+    type: BOOLEAN
+    description: TRUE if the clone is truncal / clonal in its tumour (subclonal otherwise).
+    null_semantics: not_applicable
+  - name: is_shared
+    type: BOOLEAN
+    description: TRUE if the clone is shared across multiple samples of the tumour.
+    null_semantics: not_applicable
+  - name: is_primary_clone
+    type: BOOLEAN
+    description: TRUE if the clone is present in at least one primary-tumour sample.
+    null_semantics: not_applicable
+  - name: is_met_clone
+    type: BOOLEAN
+    description: TRUE if the clone is present in at least one metastasis sample.
+    null_semantics: not_applicable
+
+joins:
+  wgd_calls:
+    on:
+      - "clone_info.tumour_id = wgd_calls.tumour_id"
+      - "clone_info.clone = wgd_calls.clone"
+  alpaca:
+    on:
+      - "clone_info.tumour_id = alpaca.tumour_id"
+      - "clone_info.clone = alpaca.clone"
+  muttable:
+    on:
+      - "clone_info.tumour_id = muttable.tumour_id"
+      - "clone_info.clone = muttable.clone"

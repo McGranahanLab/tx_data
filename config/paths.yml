@@ -1,0 +1,19 @@
+# Path config for tx_data.
+#
+# `data_root` is where the cohort source files live. `nemo_mock/` is the
+# default (synthetic mimic checked in for local dev). Override on the HPC:
+#   export TX_DATA_ROOT=/nemo/project/proj-tracerx-lung/tctProjects/lungTx/Tx842/release/tracerx_842
+
+data_root: nemo_mock
+
+# Global switch for which tumour-id form is emitted in canonical Parquet.
+# - `ltx`  : `LTX0001-Tumour1` (tx_data legacy; matches wgd_calls / alpaca / muttable)
+# - `cruk` : `CRUK0001_1` (paper-legacy; matches Zenodo assets, published figures)
+#
+# Only respected by builds that ingest CRUK-keyed sources AND by those that
+# have been retrofitted to call `tx_data.ids.apply_convention`. Existing
+# builders (alpaca, wgd_calls, muttable, etc.) still emit LTX unconditionally
+# — retrofit is TODO. New builders MUST honour this flag from the start.
+#
+# Env override: `TX_ID_CONVENTION=cruk` (or `ltx`).
+id_convention: ltx

@@ -1,0 +1,140 @@
+name: alpaca
+description: |
+  ALPACA per-clone allele-specific integer copy number for every ASCAT segment
+  in every tumour. One row per (tumour × segment × clone).
+
+  Complements `wgd_calls` (per-clone tree structure + WGD events) with the
+  actual per-clone allele-specific copy-number state, allowing gene-level
+  functional-status calls (homozygous deletion, LOH, allele-specific gain)
+  to be resolved per clone in a tumour.
+
+provenance:
+  cohort: TRACERx 842 (Tx842)
+  hpc_source: /nemo/project/proj-tracerx-lung/tctProjects/lungTx/Tx842/release/tracerx_842/ALPACA/output/cohort_results/all_tumours_combined.csv
+  format_on_source: comma-separated CSV, header row
+  received: 2026-09-03
+  received_via: 6-row head sent by User for cataloguing
+  canonical_format: Parquet (after build script)
+  pipeline: |
+    ALPACA — clone-level allele-specific CN reconstruction over the CONIPHER
+    tree. Takes ASCAT per-sample segments + the tumour tree from CONIPHER,
+    returns per-clone integer allele-specific CN at each ASCAT segment.
+
+primary_key:
+  - tumour_id
+  - segment
+  - clone
+
+grain: one row per (tumour × segment × clone)
+
+genome_build: hg19    # matches muttable / wgd_calls / alphamissense
+chr_prefix: false     # segment values start with '6_…', not 'chr6_…'
+
+joins:
+  wgd_calls:
+    on:
+      - "alpaca.tumour_id = wgd_calls.tumour_id"
+      - "alpaca.clone = wgd_calls.clone"
+    notes: |
+      Both tables use the canonical tumour_id form `LTX0001-Tumour1` and the
+      string clone form `clone1`, `clone2`, ... Direct join, no coercion.
+
+  muttable:
+    on:
+      # All columns share canonical names after the tx_data v2 build.
+      - "alpaca.tumour_id   = muttable.tumour_id"
+      - "alpaca.clone       = muttable.clone"
+      - "alpaca.segment_chr = muttable.chr"
+      - "muttable.pos BETWEEN alpaca.segment_start AND alpaca.segment_end"
+    notes: |
+      A muttable row may match multiple ALPACA rows if multiple clones' CN
+      state is being queried. For a specific clone × mutation lookup, the
+      match is unique.
+
+filters_of_interest:
+  homdel:              "pred_CN_A == 0 AND pred_CN_B == 0"
+  loh:                 "(pred_CN_A == 0 OR pred_CN_B == 0) AND (pred_CN_A + pred_CN_B) > 0"
+  amplified:           "(pred_CN_A + pred_CN_B) >= 5"
+  diploid_heterozygous: "pred_CN_A == 1 AND pred_CN_B == 1"
+
+derived_columns:
+  # Loader parses `segment` (chr_start_end) into three columns for range joins.
+  - name: segment_chr
+    description: "Chromosome parsed from `segment` (before the first `_`). String, no 'chr' prefix."
+    rule: "split(segment, '_')[0]"
+  - name: segment_start
+    description: "Start coordinate (1-based, inclusive), parsed from `segment`."
+    rule: "int(split(segment, '_')[1])"
+  - name: segment_end
+    description: "End coordinate (1-based, inclusive), parsed from `segment`."
+    rule: "int(split(segment, '_')[2])"
+  - name: total_cn
+    description: "pred_CN_A + pred_CN_B."
+    rule: "pred_CN_A + pred_CN_B"
+  - name: minor_cn
+    description: "min(pred_CN_A, pred_CN_B)."
+    rule: "min(pred_CN_A, pred_CN_B)"
+  - name: major_cn
+    description: "max(pred_CN_A, pred_CN_B)."
+    rule: "max(pred_CN_A, pred_CN_B)"
+  - name: is_homdel
+    description: "pred_CN_A == 0 AND pred_CN_B == 0."
+    rule: "pred_CN_A == 0 AND pred_CN_B == 0"
+  - name: is_loh
+    description: "min(pred_CN_A, pred_CN_B) == 0 AND total_cn > 0."
+    rule: "minor_cn == 0 AND total_cn > 0"
+
+columns:
+  - name: tumour_id
+    type: VARCHAR
+    description: |
+      Canonical tumour ID (e.g. `LTX0001-Tumour1`). Shared across every
+      tx_data per-tumour table.
+    null_semantics: not_applicable
+
+  - name: segment
+    type: VARCHAR
+    description: |
+      Encoded segment coordinates as `<chr>_<start>_<end>`, both bounds
+      inclusive, 1-based. Example `6_49506545_57245410` = chr6:49,506,545–57,245,410.
+      Parsed into `segment_chr`, `segment_start`, `segment_end` by the loader.
+    null_semantics: not_applicable
+
+  - name: clone
+    type: VARCHAR
+    description: |
+      Clone / CONIPHER cluster ID (e.g. `clone1`, `clone10`). Canonical
+      name across muttable, wgd_calls, alpaca and clone_proportions.
+    null_semantics: not_applicable
+
+  - name: pred_CN_A
+    type: INTEGER
+    description: |
+      ALPACA-predicted integer copy number of allele A in this clone at this
+      segment. `0` = allele A lost.
+    null_semantics: not_applicable
+
+  - name: pred_CN_B
+    type: INTEGER
+    description: |
+      ALPACA-predicted integer copy number of allele B in this clone at this
+      segment. `0` = allele B lost. LOH iff exactly one of (A, B) is zero and
+      total > 0. Homozygous deletion iff both are zero.
+    null_semantics: not_applicable
+
+relationships:
+  - column: tumour_id
+    references: wgd_calls.tumour_id
+  - column: [tumour_id, clone]
+    references: [wgd_calls.tumour_id, wgd_calls.clone]
+
+scope_notes: |
+  Cohort-wide file: one CSV for the whole cohort (not per-tumour). Segment
+  boundaries are assumed consistent across clones of the same tumour — same
+  ASCAT segmentation reused across all clones for that tumour.
+
+open_questions:
+  - "Are segment boundaries consistent across clones of the same tumour? Assumed yes."
+  - "Does every clone in `wgd_calls` appear in ALPACA? (Missing rows might mean 'no CN change from parent', or 'clone not processed'.) Downstream should be robust to either."
+  - "chrX / chrY handling — are they included, and if so how is allele A/B defined in males?"
+  - "Are there tumours in wgd_calls that are absent entirely from ALPACA (e.g. QC-failed)?"

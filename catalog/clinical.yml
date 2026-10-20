@@ -1,0 +1,460 @@
+name: clinical
+description: |
+  Per-patient clinical, demographic, exposure, and centrally-reviewed pathology
+  table for the Tx842 cohort. One row per patient. Multi-tumour patients are
+  encoded as two "lesion" column sets (Lesion1_… / Lesion2_… / histology1_… /
+  histology2_… etc.) on the same row — the loader unpivots these to a
+  per-tumour view for joins.
+
+  Patient-level identifiers, smoking + alcohol history, occupational/environmental
+  exposures, per-lesion pathology and staging, and relapse fields. **Notably
+  absent from this file:** per-sample purity/ploidy (in a sample-QC table
+  elsewhere), TP53 mutation status (derive from muttable), SBS4/smoking-signature
+  exposure (derive from mutations), and time-to-event survival columns
+  (OS/DFS_time + event) — need to check whether these live in a separate
+  clinical file or must be built from the relapse fields.
+
+provenance:
+  cohort: TRACERx 842 (Tx842)
+  hpc_source: /nemo/project/proj-tracerx-lung/tctProjects/lungTx/Tx842/release/tracerx_842/tx842_clinical.tsv
+  format_on_source: TSV, header row
+  received: 2026-08-31
+  received_via: 1-row head sent by User for cataloguing
+  canonical_format: Parquet (after build script)
+
+pii_note: |
+  This table carries indirect-identifier fields (age, sex, ethnicity, occupational
+  exposures, previous-cancer age, alcohol history). IDs are pseudonymised (LTX*)
+  but combined attributes could increase re-identification risk. Do not export
+  raw rows outside the workspace; publish only aggregated summaries.
+
+primary_key:
+  - Patient_ID
+
+grain: one row per patient
+
+joins:
+  # This table's grain is PER-PATIENT. To join to per-tumour analyses (muttable,
+  # wgd_calls, alphamissense) the loader must unpivot the two lesion column sets.
+  muttable:
+    on:
+      - "clinical.Patient_ID = muttable.patient_id"
+    notes: "patient-level join; for per-tumour histology use the unpivoted view (see derived_views)."
+  wgd_calls:
+    on:
+      - "clinical.Patient_ID = split_patient_from_tumour_id(wgd_calls.tumour_id)"
+    notes: "wgd_calls.tumour_id = 'LTX0001-Tumour1' → patient_id = 'LTX0001'."
+
+derived_views:
+  # Produced by the loader; not present in the source file.
+  clinical_per_tumour:
+    description: |
+      Unpivots the two-lesion columns to one row per tumour. Columns like
+      `histology1_group_central.reviewed` and `histology2_group_central.reviewed`
+      collapse into a single `histology_group` column keyed by tumour ordinal.
+    key: [Patient_ID, tumour_ordinal]
+    tumour_ordinal_mapping:
+      "1": "Lesion1_… / histology1_… columns"
+      "2": "Lesion2_… / histology2_… columns"
+    joins_to:
+      - "muttable.tumour_id (canonical form 'LTX0001-Tumour1')"
+      - "wgd_calls.tumour_id"
+
+column_groups:
+  # Grouping is documentary — all columns are still present in the columns: list below.
+  identifiers: [REGTrialNo, Patient_ID]
+  demographics: [age, sex, ethnicity]
+  baseline_health: [pre_surgery_FEV1, registration_ECOG]
+  smoking: [
+    smoking_status, smoking_status_group, Number_cigs_perday_use,
+    Number_years_smoking_use, pack_years_calculated, pack_years_truncated,
+    age_start_smoking_survey, age_start_smoking_exsmoker, age_stop_smoking_exsmoker
+  ]
+  alcohol: [
+    alcohol_units, alcohol_frequency, alcohol_frequency_over7units,
+    alcohol_years, alcohol_years_truncated
+  ]
+  surgery_treatment: [Surgery_type, adjuvant_treatment_given, adjuvant_treatment_YN]
+  centrally_reviewed_summary: [Centrally_reviewed_histology_per_patient]
+  lesion1: [
+    Lesion1_site_central.reviewed, histology1_central.reviewed,
+    histology1_group_central.reviewed, pTStage_v8_lesion1_central.reviewed,
+    pNStage_lesion1_central.reviewed, pTNMStage_v8_lesion1_central.reviewed,
+    SizePath_lesion1_central.reviewed, PathPleuInv_lesion1_central.reviewed,
+    margin_status_lesion1_central.reviewed
+  ]
+  lesion2: [
+    Lesion2_site_central.reviewed, histology2_central.reviewed,
+    histology2_group_central.reviewed, pTStage_v8_lesion2_central.reviewed,
+    pNStage_lesion2_central.reviewed, pTNMStage_v8_lesion2_central.reviewed,
+    SizePath_lesion2_central.reviewed, PathPleuInv_lesion2_central.reviewed,
+    margin_status_lesion2_central.reviewed
+  ]
+  notes: [note_histology, note_pathology_report, new_primary_cancer, new_primary_flag, second_lesion_detected_in_baseline, CTC_notes]
+  relapse: [
+    Relapse_cat_new, Relapse_site_text, Surgical_bed_recurrence, Ipsilateral_lung,
+    Mediastinum, Contralateral_lung, Pleural_nodules_effusion, Liver, Adrenal,
+    Bone, Brain, Extrathoracic_lymph_nodes, Other, Brain_only, extracranial_extrathoracic_single
+  ]
+  previous_cancer: [PrevCancerAge, Previous_cancer]
+  environmental_exposures: [
+    HomeSmoke, WorkSmoke30Yrs, WorkArsenic, WorkAsbestos, WorkBenzene,
+    WorkBisphenolA, WorkCH2O, WorkChemicals, WorkChromHex, WorkDiesel,
+    WorkDioxins, WorkMetals, WorkNatFibres, WorkPAHs, WorkPBDEs, WorkRadon,
+    WorkSolvents, WorkVinylCl
+  ]
+  pathology_freetext: [PathTissueFind]
+
+null_marker: "NA"
+free_text_uncertainty_values:
+  # Value we should be able to detect in survey columns.
+  - "Don't know"
+  - "Never"
+
+columns:
+  # ---- identifiers ----
+  - name: REGTrialNo
+    type: VARCHAR
+    description: Trial registration number (e.g. A_LTX000). Patient-level.
+    null_semantics: unknown
+  - name: Patient_ID
+    type: VARCHAR
+    description: TRACERx patient ID (e.g. LTX0000). Joins to `patient_id` in muttable.
+    null_semantics: not_applicable
+
+  # ---- demographics ----
+  - name: age
+    type: INTEGER
+    description: Age at registration/enrolment (years).
+    null_semantics: unknown
+  - name: sex
+    type: VARCHAR
+    description: Reported sex.
+    allowed_values: [Male, Female]   # extend as observed
+  - name: ethnicity
+    type: VARCHAR
+    description: Ethnicity category (survey; free-ish text, e.g. 'White- British').
+    null_semantics: unknown
+
+  # ---- baseline health ----
+  - name: pre_surgery_FEV1
+    type: DOUBLE
+    description: Pre-surgery Forced Expiratory Volume in 1 second (litres).
+    null_semantics: unknown
+  - name: registration_ECOG
+    type: INTEGER
+    description: ECOG performance status at registration (0–4).
+    null_semantics: unknown
+
+  # ---- smoking ----
+  - name: smoking_status
+    type: VARCHAR
+    description: Smoking status label (observed 'Ex-Smoker'; other likely values TBC).
+    null_semantics: unknown
+  - name: smoking_status_group
+    type: VARCHAR
+    description: Coarsened smoking status (observed 'Ex-Smoker'; likely {Never, Ex-Smoker, Current} — TBC).
+    null_semantics: unknown
+  - name: Number_cigs_perday_use
+    type: DOUBLE
+    description: Self-reported cigarettes per day.
+    null_semantics: unknown
+  - name: Number_years_smoking_use
+    type: DOUBLE
+    description: Self-reported years of smoking.
+    null_semantics: unknown
+  - name: pack_years_calculated
+    type: DOUBLE
+    description: Pack-years derived from cigs/day × years.
+    null_semantics: unknown
+  - name: pack_years_truncated
+    type: DOUBLE
+    description: Pack-years capped / winsorised for analysis (definition TBC).
+    notes: "Truncation rule TBC."
+  - name: age_start_smoking_survey
+    type: DOUBLE
+    description: Age at smoking initiation (survey question).
+    null_semantics: unknown
+  - name: age_start_smoking_exsmoker
+    type: DOUBLE
+    description: Age started smoking, reported by ex-smokers.
+    null_semantics: unknown
+  - name: age_stop_smoking_exsmoker
+    type: DOUBLE
+    description: Age stopped smoking, reported by ex-smokers.
+    null_semantics: unknown
+
+  # ---- alcohol ----
+  - name: alcohol_units
+    type: VARCHAR
+    description: Reported alcohol units (observed 'None'; likely numeric-or-'None' free text).
+    notes: "Data type to normalise on load."
+  - name: alcohol_frequency
+    type: VARCHAR
+    description: Frequency category (observed 'Never'; likely {Never, Occasional, Weekly, Daily…} — TBC).
+    null_semantics: unknown
+  - name: alcohol_frequency_over7units
+    type: VARCHAR
+    description: Frequency of drinking >7 units.
+    null_semantics: unknown
+  - name: alcohol_years
+    type: DOUBLE
+    description: Years of alcohol consumption.
+    null_semantics: unknown
+  - name: alcohol_years_truncated
+    type: DOUBLE
+    description: Winsorised `alcohol_years`.
+    notes: "Truncation rule TBC."
+
+  # ---- surgery/treatment ----
+  - name: Surgery_type
+    type: VARCHAR
+    description: Type of resection (observed 'Lobectomy').
+    null_semantics: unknown
+  - name: adjuvant_treatment_given
+    type: VARCHAR
+    description: Free text on adjuvant treatment (observed 'No adjuvant').
+    null_semantics: unknown
+  - name: adjuvant_treatment_YN
+    type: VARCHAR
+    description: Adjuvant treatment given? (Yes/No)
+    allowed_values: [Yes, No]   # extend as observed
+    null_semantics: unknown
+
+  # ---- pathology (per lesion, up to 2) ----
+  - name: Centrally_reviewed_histology_per_patient
+    type: VARCHAR
+    description: Patient-level summary of centrally-reviewed histology (observed 'LUAD').
+    notes: "Value set to extend as observed. May differ from per-lesion histology in multi-tumour patients."
+  - name: Lesion1_site_central.reviewed
+    type: VARCHAR
+    description: "Lesion 1 anatomical site (e.g. 'Right Upper Lobe')."
+  - name: histology1_central.reviewed
+    type: VARCHAR
+    description: |
+      Lesion 1 detailed histology (e.g. 'Invasive adenocarcinoma').
+      **PRIMARY histology column** for downstream analyses per User
+      2026-09-01 — this is what unpivots to `histology` in
+      `clinical_per_tumour` and drives the histology-based cohort split.
+  - name: histology1_group_central.reviewed
+    type: VARCHAR
+    description: |
+      Lesion 1 histology group. Coarser than histology1_central.reviewed.
+      Observed 'LUAD'; expect {LUAD, LUSC, other, mixed…} — full value set TBC.
+      Kept for rollups but NOT the primary column for filtering.
+  - name: pTStage_v8_lesion1_central.reviewed
+    type: VARCHAR
+    description: Lesion 1 pT stage (AJCC v8).
+  - name: pNStage_lesion1_central.reviewed
+    type: VARCHAR
+    description: Lesion 1 pN stage.
+  - name: pTNMStage_v8_lesion1_central.reviewed
+    type: VARCHAR
+    description: |
+      Lesion 1 composite pTNM stage (AJCC v8). **PRIMARY staging column**
+      per User 2026-09-01 — unpivots to `pTNM_stage` in
+      `clinical_per_tumour`.
+  - name: SizePath_lesion1_central.reviewed
+    type: DOUBLE
+    description: Lesion 1 pathological size (mm).
+  - name: PathPleuInv_lesion1_central.reviewed
+    type: VARCHAR
+    description: Lesion 1 pleural invasion (Yes/No/details).
+  - name: margin_status_lesion1_central.reviewed
+    type: VARCHAR
+    description: Lesion 1 resection margin status (e.g. R0, R1, R2).
+
+  # Lesion 2 mirrors Lesion 1 — same semantics, NA when patient has one tumour only.
+  - name: Lesion2_site_central.reviewed
+    type: VARCHAR
+    description: Lesion 2 anatomical site (NA for single-tumour patients).
+  - name: histology2_central.reviewed
+    type: VARCHAR
+    description: Lesion 2 detailed histology.
+  - name: histology2_group_central.reviewed
+    type: VARCHAR
+    description: Lesion 2 histology group.
+  - name: pTStage_v8_lesion2_central.reviewed
+    type: VARCHAR
+    description: Lesion 2 pT stage.
+  - name: pNStage_lesion2_central.reviewed
+    type: VARCHAR
+    description: Lesion 2 pN stage.
+  - name: pTNMStage_v8_lesion2_central.reviewed
+    type: VARCHAR
+    description: Lesion 2 composite pTNM.
+  - name: SizePath_lesion2_central.reviewed
+    type: DOUBLE
+    description: Lesion 2 pathological size (mm).
+  - name: PathPleuInv_lesion2_central.reviewed
+    type: VARCHAR
+    description: Lesion 2 pleural invasion.
+  - name: margin_status_lesion2_central.reviewed
+    type: VARCHAR
+    description: Lesion 2 resection margin status.
+
+  # ---- notes / free text ----
+  - name: note_histology
+    type: VARCHAR
+    description: Free-text histology reviewer notes.
+    null_semantics: measured_as_absent
+  - name: note_pathology_report
+    type: VARCHAR
+    description: Free-text pathology report notes.
+    null_semantics: measured_as_absent
+  - name: new_primary_cancer
+    type: VARCHAR
+    description: New primary cancer indicator.
+    null_semantics: unknown
+  - name: new_primary_flag
+    type: VARCHAR
+    description: Boolean-ish flag (Yes/No) for new primary.
+    null_semantics: unknown
+  - name: second_lesion_detected_in_baseline
+    type: VARCHAR
+    description: Whether a second lesion was detected at baseline.
+    null_semantics: unknown
+  - name: CTC_notes
+    type: VARCHAR
+    description: Notes on circulating tumour cell handling.
+    null_semantics: measured_as_absent
+
+  # ---- relapse (patient-level Yes/No/site) ----
+  - name: Relapse_cat_new
+    type: VARCHAR
+    description: Categorical relapse outcome.
+    notes: "Value set TBC — likely {Yes intrathoracic, Yes extrathoracic, No, Unknown} etc."
+  - name: Relapse_site_text
+    type: VARCHAR
+    description: Free-text relapse site.
+    null_semantics: measured_as_absent
+  - name: Surgical_bed_recurrence
+    type: VARCHAR
+    description: "Relapse at surgical bed? (Yes/No)"
+  - name: Ipsilateral_lung
+    type: VARCHAR
+    description: Ipsilateral lung relapse.
+  - name: Mediastinum
+    type: VARCHAR
+    description: Mediastinal relapse.
+  - name: Contralateral_lung
+    type: VARCHAR
+    description: Contralateral lung relapse.
+  - name: Pleural_nodules_effusion
+    type: VARCHAR
+    description: Pleural nodules or effusion.
+  - name: Liver
+    type: VARCHAR
+    description: Liver metastasis.
+  - name: Adrenal
+    type: VARCHAR
+    description: Adrenal metastasis.
+  - name: Bone
+    type: VARCHAR
+    description: Bone metastasis.
+  - name: Brain
+    type: VARCHAR
+    description: Brain metastasis.
+  - name: Extrathoracic_lymph_nodes
+    type: VARCHAR
+    description: Extrathoracic lymph-node metastasis.
+  - name: Other
+    type: VARCHAR
+    description: Other relapse site.
+  - name: Brain_only
+    type: VARCHAR
+    description: Brain-only relapse indicator.
+  - name: extracranial_extrathoracic_single
+    type: VARCHAR
+    description: Single extracranial-extrathoracic relapse indicator.
+
+  # ---- previous cancer ----
+  - name: PrevCancerAge
+    type: DOUBLE
+    description: Age at previous cancer diagnosis (NA if none).
+    null_semantics: not_applicable
+  - name: Previous_cancer
+    type: VARCHAR
+    description: Previous cancer? (Yes/No/detail).
+    null_semantics: unknown
+
+  # ---- environmental / occupational exposures (survey) ----
+  # All are survey categorical fields; observed values include 'Yes', 'No', 'Don't know'.
+  # Consolidated: same semantics across all of them.
+  - name: HomeSmoke
+    type: VARCHAR
+    description: Home smoking exposure (survey).
+  - name: WorkSmoke30Yrs
+    type: VARCHAR
+    description: Workplace smoking exposure across 30 years (survey).
+  - name: WorkArsenic
+    type: VARCHAR
+    description: Workplace arsenic exposure.
+  - name: WorkAsbestos
+    type: VARCHAR
+    description: Workplace asbestos exposure.
+  - name: WorkBenzene
+    type: VARCHAR
+    description: Workplace benzene exposure.
+  - name: WorkBisphenolA
+    type: VARCHAR
+    description: Workplace bisphenol A exposure.
+  - name: WorkCH2O
+    type: VARCHAR
+    description: Workplace formaldehyde exposure.
+  - name: WorkChemicals
+    type: VARCHAR
+    description: Workplace chemicals exposure (unspecified).
+  - name: WorkChromHex
+    type: VARCHAR
+    description: Workplace hexavalent chromium exposure.
+  - name: WorkDiesel
+    type: VARCHAR
+    description: Workplace diesel exhaust exposure.
+  - name: WorkDioxins
+    type: VARCHAR
+    description: Workplace dioxins exposure.
+  - name: WorkMetals
+    type: VARCHAR
+    description: Workplace metals exposure.
+  - name: WorkNatFibres
+    type: VARCHAR
+    description: Workplace natural fibres exposure.
+  - name: WorkPAHs
+    type: VARCHAR
+    description: Workplace polycyclic aromatic hydrocarbons exposure.
+  - name: WorkPBDEs
+    type: VARCHAR
+    description: Workplace polybrominated diphenyl ethers exposure.
+  - name: WorkRadon
+    type: VARCHAR
+    description: Workplace radon exposure.
+  - name: WorkSolvents
+    type: VARCHAR
+    description: Workplace solvents exposure.
+  - name: WorkVinylCl
+    type: VARCHAR
+    description: Workplace vinyl chloride exposure.
+
+  # ---- pathology tissue findings ----
+  - name: PathTissueFind
+    type: VARCHAR
+    description: Free-text summary of pathology tissue findings.
+    null_semantics: measured_as_absent
+
+relationships:
+  - column: Patient_ID
+    references: muttable.patient_id
+  - column: Patient_ID
+    references: split_patient_from_tumour_id(wgd_calls.tumour_id)
+
+open_questions:
+  - "Time-to-event survival columns (OS_time / OS_event / DFS_time / DFS_event) are NOT in this file. Is there a separate outcomes table?"
+  - "TP53 mutation status — do we compute this ourselves from muttable, or is there a canonical driver-status table?"
+  - "Mutation signature exposures (SBS4 in particular) — separate file, or derive from muttable?"
+  - "Value sets for `Relapse_cat_new`, `smoking_status`, `smoking_status_group`, `histology1/2_group_central.reviewed`."
+  - "Rule for `pack_years_truncated` and `alcohol_years_truncated`."
+  - "**Collision tumours**: do any patients have multiple histologically-distinct primaries within one lesion, breaking the Lesion1→Tumour1 / Lesion2→Tumour2 assumption? Prototype treats it as clean 1:1; deferred for revisit. See mut_essential_wgd/notes/TODO.md."
+
+deferred:
+  - "Per-sample purity/ploidy: samples were rigorously QC'd upstream; no purity floor at prototype stage."

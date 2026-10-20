@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+build/
+dist/
+
+# Virtual environments
+.venv/
+venv/
+env/
+.pixi/
+
+
+# Secrets / local env
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+.DS_Store
+.history
+
+# Derived data — regenerable from scripts + originals
+data/*
+!data/.gitkeep
+db/*
+!db/.gitkeep
+
+# nemo_mock/ is checked in — it IS the synthetic mock, not derived
+
+# temp data:
+temp_data/
+
+# notes:
+labbook

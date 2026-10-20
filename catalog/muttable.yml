@@ -1,0 +1,501 @@
+name: muttable
+description: |
+  TRACERx Tx842 cohort mutation table. One row per (mutation, sample) pair — i.e.
+  long format. Every mutation appears in every sample of its patient/tumour, even
+  when the caller did not detect it in that sample. The `is_present` column tells
+  us whether the mutation was actually called in that sample (either primary
+  per-sample calling or lenient-threshold rediscovery in the multi-sample pass).
+
+provenance:
+  cohort: TRACERx 842 (Tx842)
+  hpc_source: /nemo/project/proj-tracerx-lung/tctProjects/lungTx/Tx842/release/tracerx_842/tx842_mutation_table.tsv.gz
+  format_on_source: gzip-compressed TSV, header row
+  received: 2026-08-31
+  received_via: 5-row head sent by User for cataloguing
+  canonical_format: Parquet (after build script)
+
+primary_key:
+  # A single mutation per sample is uniquely identified by mutation_id + sample_name_hash.
+  # (mutation_id already encodes tumour_id + chr + pos + ref + alt.)
+  - mutation_id
+  - sample_name_hash
+
+column_renames:
+  # Applied by the tx_data build step so every per-tumour parquet uses the
+  # same canonical column names. Left = source-side (raw TSV), right = tx_data
+  # canonical. Downstream code should ONLY reference the canonical names.
+  patient_tumour: tumour_id           # string LTX0001-Tumour1 (canonical)
+  tumour_id: tumour_ordinal           # source integer 1/2/... (now clearly named)
+  mutation_cluster: clone             # cloneN string (matches wgd_calls / alpaca)
+  var: alt                            # matches alphamissense.alt
+
+value_normalisation:
+  tumour_id: "underscore/hyphen form coerced to `LTX0001-Tumour1`"
+  clone: "int/float `1.0` coerced to string `clone1`; NaN → null"
+  chr: "`chr17` → `17`; `chrM`/`M` → `MT`; always String"
+
+grain: one row per (mutation, sample) pair
+
+workflow_notes: |
+  Two-stage mutation calling:
+  1. Per-sample calling: each sample is called independently for somatic SNVs/indels
+     using multiple callers (varscan, mutect). This gives each sample its primary
+     mutation set.
+  2. Cross-sample rediscovery: for every mutation discovered in ≥1 sample of a
+     patient/tumour, all other samples of that patient/tumour are re-interrogated
+     at more lenient thresholds to check if the mutation is also present.
+  Result: the final table has one row for every (mutation × sample_of_same_tumour)
+  combination. Use `is_present == True` to filter to "the mutation was actually
+  detected in this sample" (whether primarily called or rediscovered).
+
+filters_of_interest:
+  # Common filter recipes downstream code should know about.
+  present_in_sample: "is_present == True"
+  called: "CALLED == True"       # PASS is True for every row — useless as a filter; use CALLED
+  coding_only: "func_refgene == 'exonic'"
+  snv_only: "is_snv == True"
+
+genome_build: hg19     # confirmed 2026-08-31. Future hg38 muttable will replace this file entirely (no liftover in-pipeline).
+chr_prefix: false      # values are '10', not 'chr10'
+
+columns:
+  # ---- identifiers ----
+  - name: patient_id
+    type: VARCHAR
+    description: TRACERx patient ID (e.g. LTX0100).
+    null_semantics: unknown
+  - name: tumour_id
+    type: VARCHAR
+    description: |
+      Canonical tumour ID (e.g. `LTX0100-Tumour1`). Source column
+      `patient_tumour` is normalised from `LTX0100_tumour1` to this form and
+      renamed by the tx_data builder.
+    null_semantics: unknown
+  - name: tumour_ordinal
+    type: INTEGER
+    description: |
+      Tumour ordinal within the patient (1, 2, ...). Source column name was
+      `tumour_id`; renamed here because tx_data uses `tumour_id` for the
+      canonical string form.
+    null_semantics: unknown
+  - name: sample_name_hash
+    type: VARCHAR
+    description: |
+      Hashed region-level sample ID. Format observed: LTX{patient}_{SU|BS}_{T1|T2}-{R1|R2|...}--{hash}.
+      SU = surgical (tumour) sample, BS = blood, Tn = tumour ordinal, Rn = region ordinal.
+    null_semantics: unknown
+  - name: gl_sample_name_hash
+    type: VARCHAR
+    description: Germline (blood) sample hash used as normal for calling. Format LTX{patient}_BS_GL--{hash}.
+    null_semantics: unknown
+  - name: mutation_id
+    type: VARCHAR
+    description: |
+      Unique mutation identifier per patient/tumour. Format:
+      {patient}_{tumour_ordinal}:{chr}:{pos}:{ref}:{alt}
+      Examples:
+        SNV       LTX0100_1:10:105200138:C:G
+        Deletion  LTX0001_1:10:99003980:A:-
+      NOTE: uses `pos` (left-anchor for indels), NOT `start`. For deletions this
+      means `mutation_id` refers to the base BEFORE the deleted region.
+    null_semantics: unknown
+
+  # ---- locus ----
+  - name: chr
+    type: VARCHAR
+    description: Chromosome, no 'chr' prefix (values like '10', 'X').
+    null_semantics: unknown
+  - name: start
+    type: BIGINT
+    description: |
+      Genomic start position of the variant, 1-based. For SNVs and deletions
+      of length N, `stop = start + N - 1` (i.e. the last deleted base).
+    null_semantics: unknown
+  - name: stop
+    type: BIGINT
+    description: |
+      Genomic stop position. For SNVs equals `start`. For deletions marks the
+      last deleted base.
+    null_semantics: unknown
+  - name: pos
+    type: BIGINT
+    description: |
+      "Left-anchor" position used to build `mutation_id`. For SNVs, pos == start.
+      For DELETIONS, `pos == start - 1` (VCF-style left anchor — the base
+      immediately preceding the deletion).
+      For INSERTIONS: TBC (need an insertion example). Likely also pos == start - 1
+      following VCF convention.
+      **`mutation_id` is built from `pos`, NOT from `start`** — see `mutation_id`.
+    notes: "Used as the join key when a canonical mutation_id is needed."
+  - name: ref
+    type: VARCHAR
+    description: |
+      Reference allele. For SNVs, one base. For deletions, the deleted bases
+      (e.g. `A` for a single-base deletion). For insertions: TBC — likely `-`
+      following the null-marker convention used for deletions' `var`.
+    null_semantics: unknown
+    notes: "The `-` character is used as the null-allele marker on the opposite side of the indel."
+  - name: alt
+    type: VARCHAR
+    description: |
+      Variant (alternate) allele. For SNVs, one base. For DELETIONS, `-` (the
+      null-allele marker). For INSERTIONS: presumably the inserted bases — TBC.
+      Source column name was `var`; renamed to `alt` for consistency with
+      alphamissense.alt.
+    null_semantics: unknown
+
+  # ---- per-sample calling evidence ----
+  - name: var_count
+    type: INTEGER
+    description: Reads supporting the variant allele in THIS sample.
+    null_semantics: measured_as_absent
+  - name: ref_count
+    type: INTEGER
+    description: Reads supporting the reference allele in THIS sample.
+    null_semantics: measured_as_absent
+  - name: cov
+    type: INTEGER
+    description: Coverage at this locus in this sample (approximately var_count + ref_count).
+    null_semantics: measured_as_absent
+  - name: vaf
+    type: DOUBLE
+    description: Variant allele frequency in this sample = var_count / cov.
+    null_semantics: measured_as_absent
+
+  # ---- cross-sample aggregates (same value within a patient/tumour) ----
+  - name: max_var_count
+    type: INTEGER
+    description: Max var_count for this mutation across all samples of the same patient/tumour. Inferred.
+    notes: "Value is constant across all rows sharing the same mutation_id — confirm definition."
+  - name: min_depth
+    type: INTEGER
+    description: Min depth across all samples of the same patient/tumour for this locus. Inferred.
+    notes: "Inferred; confirm."
+  - name: max_vaf
+    type: DOUBLE
+    description: Max VAF for this mutation across all samples of the same patient/tumour. Inferred.
+    notes: "Inferred; confirm."
+
+  # ---- presence / calling flags ----
+  - name: is_present
+    type: BOOLEAN
+    description: |
+      CRITICAL: whether the mutation was actually called in THIS sample (primary
+      per-sample calling or lenient-threshold rediscovery). Use this to filter
+      out placeholder rows for samples where the mutation was not detected.
+    null_semantics: not_applicable
+
+  - name: is_snv
+    type: BOOLEAN
+    description: Mutation is a single-nucleotide variant.
+    null_semantics: not_applicable
+  - name: is_indel
+    type: BOOLEAN
+    description: Mutation is an insertion or deletion.
+    null_semantics: not_applicable
+  - name: is_mnv
+    type: BOOLEAN
+    description: Mutation is a multi-nucleotide variant.
+    null_semantics: not_applicable
+
+  # ---- per-sample caller flags ----
+  - name: varscan
+    type: BOOLEAN
+    description: Called by Varscan in this sample.
+    null_semantics: not_applicable
+  - name: mutect
+    type: BOOLEAN
+    description: Called by Mutect in this sample.
+    null_semantics: not_applicable
+  - name: vaf02
+    type: BOOLEAN
+    description: VAF ≥ 0.02 in this sample (inferred).
+    notes: "Threshold value inferred from column name."
+
+  # ---- any-sample aggregates of the above ----
+  - name: varscan_any
+    type: BOOLEAN
+    description: Called by Varscan in ≥1 sample of this patient/tumour.
+    null_semantics: not_applicable
+  - name: mutect_any
+    type: BOOLEAN
+    description: Called by Mutect in ≥1 sample of this patient/tumour.
+    null_semantics: not_applicable
+  - name: vaf02_any
+    type: BOOLEAN
+    description: VAF ≥ 0.02 in ≥1 sample of this patient/tumour.
+    null_semantics: not_applicable
+
+  # ---- annotation ----
+  - name: gene
+    type: VARCHAR
+    description: Gene symbol (Annovar RefGene).
+    null_semantics: not_applicable
+  - name: func_refgene
+    type: VARCHAR
+    description: |
+      Annovar Func.refGene. Observed values so far: exonic, ncRNA_intronic.
+      Standard Annovar set also includes: intronic, splicing, UTR3, UTR5,
+      intergenic, upstream, downstream, ncRNA_exonic, ncRNA_splicing.
+    null_semantics: not_applicable
+  - name: aachange_refgene
+    type: VARCHAR
+    description: |
+      Annovar AAChange.refGene. Format: GENE:TRANSCRIPT:EXON:c.HGVS:p.HGVS
+      (e.g. PDCD11:NM_014976:exon29:c.C4240G:p.L1414V).
+    null_semantics: not_applicable
+  - name: snp137
+    type: VARCHAR
+    description: dbSNP 137 annotation.
+    null_semantics: not_applicable
+  - name: cosmic90_coding
+    type: VARCHAR
+    description: COSMIC v90 coding annotation.
+    null_semantics: not_applicable
+  - name: cadd13gt10
+    type: BOOLEAN
+    description: CADD v1.3 score ≥ 10.
+    null_semantics: not_applicable
+  - name: ljb23_sift
+    type: VARCHAR
+    description: SIFT annotation from LJB v2.3 (score, category).
+    null_semantics: not_applicable
+  - name: ljb23_pp2hvar
+    type: VARCHAR
+    description: PolyPhen-2 HVAR annotation from LJB v2.3 (score, category).
+    null_semantics: not_applicable
+  - name: gnomad211_af
+    type: DOUBLE
+    description: gnomAD v2.1.1 allele frequency.
+    null_semantics: not_applicable
+
+  # ---- global QC ----
+  - name: CALLED
+    type: BOOLEAN
+    description: |
+      Overall CALLED flag. Meaningful filter — is sometimes false. Use as the
+      default mutation-quality filter for downstream analyses.
+    null_semantics: not_applicable
+  - name: PASS
+    type: BOOLEAN
+    description: |
+      Overall PASS flag. In Tx842 this is TRUE for every row observed so far,
+      so it carries no information — ignore in favour of CALLED. Kept for
+      lineage / provenance.
+    notes: "Effectively constant TRUE; do not use as a filter."
+
+  # ---- driver annotation ----
+  - name: pan_cancer_driver
+    type: BOOLEAN
+    description: Gene is a pan-cancer driver.
+    null_semantics: not_applicable
+  - name: lung_driver
+    type: BOOLEAN
+    description: Gene is a lung-cancer driver.
+    null_semantics: not_applicable
+  - name: luad_driver
+    type: BOOLEAN
+    description: Gene is a LUAD driver.
+    null_semantics: not_applicable
+  - name: lusc_driver
+    type: BOOLEAN
+    description: Gene is a LUSC driver.
+    null_semantics: not_applicable
+  - name: oncogene
+    type: BOOLEAN
+    description: Gene classified as oncogene.
+    null_semantics: not_applicable
+  - name: tumor_suppressor
+    type: BOOLEAN
+    description: Gene classified as tumour suppressor.
+    null_semantics: not_applicable
+  - name: cosmic_count
+    type: INTEGER
+    description: Recurrence count in COSMIC.
+    null_semantics: not_applicable
+  - name: is_deleterious
+    type: BOOLEAN
+    description: Damaging-consequence flag (nonsense / frameshift / splice-disrupting etc.). Confirm exact rule.
+    notes: "Rule TBC."
+  - name: driver_category
+    type: VARCHAR
+    description: Driver tier / category label. Confirm value set.
+    notes: "Categorical, values TBC."
+  - name: is_driver_mut
+    type: BOOLEAN
+    description: This specific mutation (not just gene) is classified as a driver.
+    null_semantics: not_applicable
+
+  # ---- FFPE quality ----
+  - name: ffpe
+    type: BOOLEAN
+    description: Sample is FFPE (vs fresh-frozen).
+    null_semantics: not_applicable
+  - name: ffpe_confidence
+    type: VARCHAR
+    description: FFPE-artefact confidence category (e.g. high_conf).
+    notes: "Value set TBC."
+
+  # ---- local copy number and mutation copy number ----
+  - name: cn_a
+    type: DOUBLE
+    description: Copy number of allele A at this locus in this sample.
+    null_semantics: not_measured
+  - name: cn_b
+    type: DOUBLE
+    description: Copy number of allele B at this locus in this sample.
+    null_semantics: not_measured
+  - name: major_cn
+    type: DOUBLE
+    description: Major allele copy number at this locus (= max(cn_a, cn_b)).
+    null_semantics: not_measured
+  - name: minor_cn
+    type: DOUBLE
+    description: Minor allele copy number at this locus (= min(cn_a, cn_b)).
+    null_semantics: not_measured
+  - name: mutcpn
+    type: DOUBLE
+    description: |
+      Mutation copy number (MCN) — estimated number of copies bearing the
+      variant allele in the tumour compartment of this sample. Used for
+      timing (pre- vs post-CN-gain mutations).
+    null_semantics: not_measured
+
+  # ---- CCF, clonality, clustering ----
+  - name: phylo_ccf
+    type: DOUBLE
+    description: Phylogenetically-corrected cancer cell fraction in this sample.
+    null_semantics: not_measured
+  - name: obs_ccf
+    type: DOUBLE
+    description: Observed CCF in this sample (uncorrected).
+    null_semantics: not_measured
+  - name: clone_region_proportion
+    type: DOUBLE
+    description: Proportion of the sample composed of the mutation's clone.
+    notes: "Definition TBC."
+  - name: mean_cluster_region_ccf
+    type: DOUBLE
+    description: Mean CCF of this mutation's cluster across samples of the patient/tumour.
+    notes: "Definition TBC."
+  - name: cluster_region_clonality
+    type: VARCHAR
+    description: Clonality label for the mutation's cluster (e.g. clonal, subclonal).
+    allowed_values: [clonal, subclonal]  # TBC — extend if observed
+  - name: is_trunk
+    type: BOOLEAN
+    description: Mutation sits on the trunk (root cluster) of the tumour phylogeny.
+    null_semantics: not_applicable
+  - name: timing
+    type: VARCHAR
+    description: Timing label (e.g. early). Provenance and rule TBC.
+    notes: "Ignore for now (2026-08-31) — origin unknown, do not use in analysis until documented."
+  - name: clone
+    type: VARCHAR
+    description: |
+      CONIPHER cluster ID canonicalised to `cloneN` string form. Source
+      column name was `mutation_cluster` (float); tx_data normalises the
+      value (`1.0` → `"clone1"`) and renames the column to `clone` to match
+      wgd_calls / alpaca / clone_proportions.
+      Null when the mutation was excluded from clustering (still detected,
+      but not placed on the subclonal reconstruction).
+      Clustering is per tumour: `clone` ids are unique within a tumour,
+      NOT across tumours or across patients.
+    null_semantics: not_applicable   # null = mutation excluded from clustering
+  - name: clean_cluster
+    type: BOOLEAN
+    description: Cluster passed cleaning/QC.
+    notes: "Rule TBC."
+  - name: tree_cluster
+    type: BOOLEAN
+    description: |
+      TRUE = cluster was placed on the final CONIPHER tree.
+      FALSE = cluster could not be fit onto the tree (pigeonhole or similar
+        principle violations). Mutations are still real detections and usable
+        for some analyses, but *not* for analyses that require the cluster's
+        position on the tree — including pre/post-WGD stratification.
+      NaN = clustering not applicable (mutation_cluster is NaN).
+    null_semantics: not_applicable
+  - name: tree_cn_removed_cluster
+    type: BOOLEAN
+    description: |
+      TRUE = cluster was removed from the tree for copy-number reasons.
+      NaN = not applicable. Mutations from such clusters should generally be
+      excluded from CN-sensitive analyses.
+    null_semantics: not_applicable
+  - name: is_cn_fail
+    type: BOOLEAN
+    description: Mutation failed a copy-number-based QC.
+    notes: "Rule TBC."
+
+  # ---- ITH state and homogeneity ----
+  - name: ith_state
+    type: INTEGER
+    description: Intra-tumour heterogeneity state category.
+    notes: "Value set TBC."
+  - name: ith_state_ambiguity1
+    type: INTEGER
+    description: ITH state under ambiguity-tier-1 resolution.
+    notes: "TBC."
+  - name: is_homogen
+    type: BOOLEAN
+    description: Mutation is present homogeneously across sampled regions.
+    notes: "Rule TBC."
+  - name: is_artefact_sig_fail
+    type: BOOLEAN
+    description: Mutation flagged by artefact-signature QC.
+    notes: "Rule TBC."
+  - name: is_homogen_ambiguity1
+    type: BOOLEAN
+    description: Homogeneity under ambiguity-tier-1 resolution.
+    notes: "TBC."
+
+  # ---- RNA support ----
+  - name: rna_var_count
+    type: INTEGER
+    description: Variant-supporting reads from RNA-seq for this sample.
+    null_semantics: not_measured
+  - name: rna_vaf
+    type: DOUBLE
+    description: VAF at this locus from RNA-seq.
+    null_semantics: not_measured
+  - name: rna_cov
+    type: INTEGER
+    description: RNA coverage at this locus.
+    null_semantics: not_measured
+  - name: is_expressed
+    type: BOOLEAN
+    description: Mutation is expressed at RNA level in this sample.
+    null_semantics: not_measured
+  - name: is_expressed_any
+    type: BOOLEAN
+    description: Mutation is expressed at RNA level in ≥1 sample of the patient/tumour.
+    null_semantics: not_measured
+
+scope_notes: |
+  Some entities in this cohort are per-PATIENT, others per-TUMOUR. Some patients
+  have multiple tumours, encoded in `tumour_id` (e.g. `LTX0001-Tumour2`).
+  - PER-TUMOUR: clustering, phylogeny, WGD calls (via PGDD on the tumour tree),
+    mutation aggregates like max_vaf.
+  - PER-PATIENT: clinical outcomes (survival), demographics.
+  Join carefully: never join a per-patient metric to a per-tumour analysis
+  without picking a rule for multi-tumour patients (e.g. drop, first tumour,
+  worst tumour).
+
+relationships:
+  # To be filled in as we catalog the sibling tables.
+  - column: patient_id
+    references: patients.patient_id           # per-patient (TBC)
+  - column: tumour_id
+    references: wgd_calls.tumour_id           # per-tumour, canonical
+  - column: sample_name_hash
+    references: samples.sample_name_hash      # per-region (TBC)
+  - column: clone
+    references: wgd_calls.clone               # unique within tumour_id
+
+open_questions:
+  - "Insertion encoding: does `ref == '-'`, `pos == start - 1`? Need an insertion example to confirm."
+  - "Value set for `ith_state`, `ith_state_ambiguity1`, `driver_category`, `ffpe_confidence`."
+  - "Definitions of QC booleans: `clean_cluster`, `is_cn_fail`, `is_homogen*`, `is_artefact_sig_fail`, `is_deleterious`."
+  - "Confirm meaning of `max_var_count`, `min_depth`, `max_vaf` aggregates."
+  - "Origin/rule for the `timing` column."

@@ -1,0 +1,112 @@
+name: purity_ploidy
+description: |
+  Per-region (per-sample) purity and ploidy estimates for Tx842 tumour
+  samples. One row per sequencing region. Values match whatever upstream
+  QC pipeline produced them (likely ASCAT or Battenberg on WGS).
+
+  The source carries only an opaque `sample_name_hash` column keyed to the
+  same sample-id convention as `muttable.sample_name_hash` and the kallisto
+  sample columns:
+      <LTX|CRUK><digits>_SU_T<tumour_ordinal>-R<region>--<hash>
+  e.g. `LTX0001_SU_T1-R1--6ecf51f11b1b`.
+  The build script parses this into canonical (`tumour_id`, `region`) so
+  the table joins directly against every other per-tumour table while
+  preserving the original hash for lossless joins to muttable + kallisto.
+
+provenance:
+  cohort: TRACERx 842 (Tx842)
+  hpc_source: /nemo/project/proj-tracerx-lung/tctProjects/lungTx/Tx842/release/tracerx_842/tx842_purity_ploidy.csv
+  format_on_source: CSV, header row
+  received: 2026-10-20
+  received_via: User (Discord) supplied Nemo path + 2-row head
+  canonical_format: Parquet (after build script)
+  pipeline: upstream per-sample QC (ASCAT / Battenberg on WGS, TBC)
+
+primary_key:
+  - sample_name_hash
+
+grain: one row per sequencing region (sample)
+
+genome_build: hg19
+
+joins:
+  muttable:
+    on:
+      - "purity_ploidy.sample_name_hash = muttable.sample_name_hash"
+    notes: "Lossless, exact — same hash across both tables."
+  wgd_calls:
+    on:
+      - "purity_ploidy.tumour_id = wgd_calls.tumour_id"
+    notes: "Per-tumour join; purity_ploidy's finer per-region grain is averaged / selected downstream."
+  kallisto:
+    on:
+      - "purity_ploidy.sample_name_hash = kallisto sample column name"
+
+id_normalisation:
+  tumour_id:
+    canonical: "LTX0001-Tumour1"
+    source_coercions:
+      - "parse 'LTX0001_SU_T1-R1--…' prefix → LTX0001 + ordinal 1 → canonical via tx_data.ids"
+  region:
+    canonical: "R1"
+    source_coercions:
+      - "parse '…-R<n>--…' → 'R<n>'"
+
+columns:
+  - name: sample_name_hash
+    type: VARCHAR
+    description: |
+      Opaque per-sample identifier verbatim from source. Format:
+      `<LTX|CRUK><digits>_SU_T<tumour_ordinal>-R<region>--<hash>`.
+      Primary key for this table; also the join key against
+      `muttable.sample_name_hash` and the kallisto sample columns.
+    null_semantics: not_applicable
+
+  - name: tumour_id
+    type: VARCHAR
+    description: |
+      Canonical per-tumour identifier derived from `sample_name_hash`
+      (e.g. `LTX0001-Tumour1`). Shared across every tx_data per-tumour
+      table.
+    null_semantics: not_applicable
+
+  - name: region
+    type: VARCHAR
+    description: |
+      Within-tumour region label, e.g. `R1`, `R2`. Derived from the
+      `-R<n>--` segment of `sample_name_hash`. Not globally unique on its
+      own — only `(tumour_id, region)` or `sample_name_hash` is.
+    null_semantics: not_applicable
+
+  - name: purity
+    type: DOUBLE
+    description: |
+      Estimated tumour-cell fraction in the sample, nominally in [0, 1].
+      Low-purity samples (< ~0.2) are commonly treated as unreliable for
+      downstream CN / clonality calling — advisory, not a hard filter here.
+    null_semantics: unknown
+
+  - name: ploidy
+    type: DOUBLE
+    description: |
+      Estimated average tumour genome ploidy. ~2 for diploid tumours,
+      ~4 for clonal-WGD tumours; non-integer values arise from mixed
+      populations and sample purity.
+    null_semantics: unknown
+
+relationships:
+  - column: sample_name_hash
+    references: muttable.sample_name_hash
+  - column: tumour_id
+    references: wgd_calls.tumour_id
+
+scope_notes: |
+  Grain is per-sample (region-level), not per-tumour. A multi-region tumour
+  has one row per region, each with its own purity and ploidy. For
+  tumour-level rollups the caller chooses the aggregation rule (mean / max
+  purity, representative region, etc.) — the build script does not pre-aggregate.
+
+open_questions:
+  - "Which upstream caller produced these — ASCAT, Battenberg, Purple, or a consensus?"
+  - "Is there a documented purity floor used by the lab (e.g. drop samples < 0.1)?"
+  - "Are germline/normal samples excluded on source, or should the loader filter them out?"

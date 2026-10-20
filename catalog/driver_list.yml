@@ -1,0 +1,167 @@
+name: driver_list
+description: |
+  TRACERx-bespoke driver gene list for Tx842. One row per gene. Combines
+  mutation-driver calls (CGC v103 + IntoGen 2024 + TRACERx 421 additions) with
+  copy-number driver calls (CGC v103 + TX421 additions + Beroukhim 2013,
+  doi:10.1038/ng.3564) and provides both hg19 and hg38 genomic coordinates.
+
+  Two recommended filters:
+    - SNVs: filter to `lung_mut_driver == TRUE`  (broader: `mut_driver == TRUE`)
+    - CN  : filter to `lung_CN_driver  == TRUE`  (broader: `CN_driver == TRUE`)
+
+  This replaces the earlier plan to use COSMIC CGC directly; the TX842 list is
+  what the TRACERx pipeline uses and is what we should defer to.
+
+provenance:
+  cohort: TRACERx 842 (Tx842)
+  hpc_source: /nemo/project/proj-tracerx-lung/tctProjects/lungTx/Tx842/release/tracerx_842/drivers/tx842_driver_gene_list.tsv
+  format_on_source: TSV, header row
+  received: 2026-09-01
+  received_via: 1-row head sent by User for cataloguing
+  canonical_format: Parquet (after build script)
+  file_last_updated_upstream: 2026-05-13
+  gene_annotation: GENCODE v49
+
+primary_key:
+  - Hugo_Symbol
+
+grain: one row per gene
+
+chr_prefix: true      # chr_hg19 / chr_hg38 values include the 'chr' prefix (differs from muttable which does not)
+
+filters_of_interest:
+  # These are the recommended filters for downstream code (per User 2026-09-01).
+  snv_drivers_lung: "lung_mut_driver == TRUE"        # PRIMARY for our SNV analysis
+  snv_drivers_pan:  "mut_driver == TRUE"             # broader (CGC + IntoGen + TX421)
+  cn_drivers_lung:  "lung_CN_driver == TRUE"
+  cn_drivers_pan:   "CN_driver == TRUE"
+
+columns:
+  - name: Hugo_Symbol
+    type: VARCHAR
+    description: HGNC gene symbol. Joins to muttable.gene.
+    null_semantics: not_applicable
+
+  - name: gene_id
+    type: VARCHAR
+    description: Ensembl gene ID (ENSG*). Joins to alphamissense.Gene / gene_ensembl_any.
+    null_semantics: not_applicable
+
+  - name: driver_gene
+    type: BOOLEAN
+    description: Aggregate flag — TRUE if the gene is a driver by ANY criterion (mut and/or CN, pan or lung).
+    null_semantics: not_applicable
+
+  - name: driver_role
+    type: VARCHAR
+    description: Broad role (e.g. oncogene, tumor_suppressor, fusion). Full value set TBC.
+    notes: "Value set to grow as observed."
+
+  - name: CGC_TIER
+    type: INTEGER
+    description: COSMIC CGC tier (1 = strongest evidence, 2 = weaker); NULL when not in CGC.
+    null_semantics: not_applicable
+
+  - name: mut_driver
+    type: BOOLEAN
+    description: |
+      TRUE if the gene is a mutation driver (pan-cancer). Sources union: CGC
+      v103, IntoGen 2024, TX421 additions. Use as the BROAD SNV-driver filter.
+    null_semantics: not_applicable
+
+  - name: lung_mut_driver
+    type: BOOLEAN
+    description: |
+      TRUE if the gene is a mutation driver in the lung-specific context.
+      **PRIMARY SNV-driver filter** per User 2026-09-01.
+    null_semantics: not_applicable
+
+  - name: mut_driver_source
+    type: VARCHAR
+    description: |
+      Source label for the mutation-driver call (e.g. CGC_v104, IntoGen_2024,
+      TX421). NB the file header comment references CGC v103 but observed rows
+      may show v104 — expected drift, both are accepted.
+    null_semantics: not_applicable
+
+  - name: CN_driver
+    type: BOOLEAN
+    description: |
+      TRUE if the gene is a copy-number driver (pan-cancer). Sources: CGC v103,
+      TX421 additions, Beroukhim 2013 (doi:10.1038/ng.3564).
+    null_semantics: not_applicable
+
+  - name: lung_CN_driver
+    type: BOOLEAN
+    description: TRUE if the gene is a CN driver in the lung-specific context. Recommended CN-driver filter.
+    null_semantics: not_applicable
+
+  - name: CNA_type
+    type: VARCHAR
+    description: For CN drivers, the alteration type (e.g. amp, del). NULL when CN_driver is FALSE.
+    notes: "Value set to grow as observed."
+
+  - name: CN_driver_source
+    type: VARCHAR
+    description: Source label for the CN-driver call.
+    null_semantics: not_applicable
+
+  # ---- coordinates ----
+  - name: chr_hg38
+    type: VARCHAR
+    description: Chromosome on hg38, WITH `chr` prefix (e.g. 'chr10').
+    null_semantics: not_applicable
+  - name: start_hg38
+    type: BIGINT
+    description: Gene start on hg38.
+    null_semantics: not_applicable
+  - name: end_hg38
+    type: BIGINT
+    description: Gene end on hg38.
+    null_semantics: not_applicable
+  - name: cyto_hg38
+    type: VARCHAR
+    description: Cytoband on hg38 (e.g. '10q11.23').
+    null_semantics: not_applicable
+  - name: strand_hg38
+    type: VARCHAR
+    description: Strand on hg38 ('+' or '-').
+    allowed_values: ["+", "-"]
+
+  - name: chr_hg19
+    type: VARCHAR
+    description: Chromosome on hg19, WITH `chr` prefix.
+    null_semantics: not_applicable
+  - name: start_hg19
+    type: BIGINT
+    description: Gene start on hg19.
+    null_semantics: not_applicable
+  - name: end_hg19
+    type: BIGINT
+    description: Gene end on hg19.
+    null_semantics: not_applicable
+  - name: cyto_hg19
+    type: VARCHAR
+    description: Cytoband on hg19.
+    null_semantics: not_applicable
+
+  - name: SYNONYMS
+    type: VARCHAR
+    description: Comma-separated gene aliases + transcript/protein IDs.
+    null_semantics: measured_as_absent
+
+relationships:
+  - column: Hugo_Symbol
+    references: muttable.gene
+  - column: gene_id
+    references: alphamissense.gene_ensembl_any
+
+genome_build_note: |
+  Coordinates provided in BOTH hg19 and hg38 → no liftover needed for gene-level
+  joins, regardless of which build the muttable is on. muttable currently uses
+  bare chromosome numbers (`10`) while this file uses `chr10` — normalise on
+  join.
+
+open_questions:
+  - "Value sets for `driver_role`, `CNA_type`, and `mut_driver_source`/`CN_driver_source`."
+  - "Are Hugo_Symbol values consistent with muttable.gene? Some drivers may appear as synonyms only — SYNONYMS column exists to handle this if needed."

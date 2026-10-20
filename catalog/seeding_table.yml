@@ -1,0 +1,107 @@
+name: seeding_table
+description: |
+  Per-tumour metastatic-seeding characterisation from the Tx842 primary+met
+  release. One row per tumour, summarising whether the seeding event was
+  clonal or polyclonal, whether it followed a monophyletic or polyphyletic
+  pattern, and per-metastasis breakdowns of the same two axes.
+
+  Consumed downstream as ``seedingTableFull.csv`` by the paper's figure
+  scripts (``SURVIVAL_scnaith_diversity_pipeline.R``,
+  ``SEEDING_compare_seeding_non_seeding.R``,
+  ``SEEDING_vs_nonseeding_plot_cross_genome_changes.R``,
+  ``COEVOLUTION_plot_mut_cpn_rate.R``, etc.). Adapters in downstream
+  projects (e.g. ``tx800_alpaca_replica``) rename tx_data canonical
+  columns back to the paper's camelCase names.
+
+provenance:
+  cohort: TRACERx 842 (Tx842)
+  hpc_source: /nemo/project/proj-tracerx-lung/tctProjects/lungTx/Tx842/release/tracerx_842/primary_met/tx842_primary_met_seedingTableFull.txt
+  format_on_source: space-separated text (R data.frame written by ``write.table``); header row
+  received: 2026-09-23
+  received_via: User (Discord) supplied path + 4-row head
+  canonical_format: Parquet (after build script)
+  identifier_system: |
+    Source ``tumour_id`` uses the bare-underscore LTX form (``LTX0121_1``) —
+    same flavour as the ``clone_info`` release. Handled by
+    ``tx_data.ids.apply_convention_scalar``; any of the recognised
+    tumour_id flavours is accepted.
+
+primary_key:
+  - tumour_id
+
+grain: one row per tumour
+
+column_renames:
+  # Source-side camelCase → canonical snake_case.
+  seedingClonality: seeding_clonality
+  seedingPhyletic: seeding_phyletic
+  individualSeedingClonality: individual_seeding_clonality
+  individualSeedingPhyletic: individual_seeding_phyletic
+  nRegions: n_regions
+
+value_normalisation:
+  tumour_id: |
+    Auto-detected flavour + normalised to the configured ``id_convention``
+    (default LTX ``LTX0121-Tumour1``). See ``clone_info`` for the same
+    pattern.
+  individual_seeding_clonality: |
+    Semicolon-separated list of per-metastasis clonality labels — kept as
+    the source string. Consumers that need per-metastasis rows should
+    ``str.split(';')`` locally; splitting to long-form here would obscure
+    the paired ordering with ``individual_seeding_phyletic``.
+  individual_seeding_phyletic: |
+    Same treatment as ``individual_seeding_clonality``; the two columns
+    are position-paired.
+
+columns:
+  - name: tumour_id
+    type: VARCHAR
+    description: Canonical tumour identifier in the configured ``id_convention`` form.
+    null_semantics: not_applicable
+  - name: seeding_clonality
+    type: VARCHAR
+    description: |
+      Overall seeding clonality for the tumour, from the categorical set
+      ``{monoclonal, polyclonal}``.
+    null_semantics: not_applicable
+  - name: seeding_phyletic
+    type: VARCHAR
+    description: |
+      Overall seeding phyletic pattern, from ``{monophyletic, polyphyletic}``.
+    null_semantics: not_applicable
+  - name: individual_seeding_clonality
+    type: VARCHAR
+    description: |
+      Semicolon-separated per-metastasis clonality labels
+      (``monoclonal;polyclonal;...``). One token per metastatic region;
+      count equals ``n_regions``.
+    null_semantics: not_applicable
+  - name: individual_seeding_phyletic
+    type: VARCHAR
+    description: |
+      Semicolon-separated per-metastasis phyletic labels
+      (``monophyletic;polyphyletic;...``). Position-paired with
+      ``individual_seeding_clonality``.
+    null_semantics: not_applicable
+  - name: n_regions
+    type: INTEGER
+    description: |
+      Number of metastatic regions summarised in the two ``individual_*``
+      lists. Loader asserts that the split length matches this.
+    null_semantics: not_applicable
+
+invariants:
+  - "tumour_id is unique after build (one row per tumour); loader raises if duplicates encountered."
+  - "For every row, ``n_regions == len(individual_seeding_clonality.split(';')) == len(individual_seeding_phyletic.split(';'))``."
+
+joins:
+  clone_info:
+    on:
+      - "seeding_table.tumour_id = clone_info.tumour_id"
+    notes: |
+      Tumour-level seeding characterisation joins to per-clone
+      classifications (``is_seeding_clone`` etc.) in ``clone_info`` for
+      analyses that mix tumour- and clone-level views.
+  alpaca:
+    on:
+      - "seeding_table.tumour_id = alpaca.tumour_id"
