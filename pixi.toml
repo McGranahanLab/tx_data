@@ -11,6 +11,7 @@ polars = ">=1.0"
 pyarrow = ">=15.0"
 pyyaml = ">=6.0"
 pytest = ">=8.0"
+r-base = ">=4.0"
 
 [pypi-dependencies]
 tx_data = { path = ".", editable = true }
