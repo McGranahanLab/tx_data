@@ -15,7 +15,7 @@ description: |
 
 provenance:
   cohort: TRACERx 842 (Tx842)
-  hpc_source: /nemo/project/proj-tracerx-lung/tctProjects/lungTx/Tx842/release/tracerx_842/tx842_primary_met_cloneInfo.df.txt
+  hpc_source: /nemo/project/proj-tracerx-lung/tctProjects/lungTx/Tx842/release/tracerx_842/primary_met/tx842_primary_met_cloneInfo.df.txt
   format_on_source: tab-separated text (R data.frame written by ``write.table``); header row
   received: 2026-09-23
   received_via: User (Discord) supplied permanent path + head + column-naming caveats
