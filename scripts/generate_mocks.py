@@ -38,8 +38,28 @@ WGD_DIR = MOCK_ROOT / "WGD" / "release_tx842"
 ALPACA_DIR = MOCK_ROOT / "ALPACA" / "output" / "cohort_results"
 CLONE_PROP_ROOT = MOCK_ROOT / "ALPACA" / "input"
 KALLISTO_DIR = MOCK_ROOT / "alt" / "tx842_mets_rnaseq" / "_aggregate" / "kallisto_mat"
+SAMPLE_MAP_DIR = MOCK_ROOT / "mapping_files"
 
 RNG = random.Random(20260831)
+
+# Every tumour-sample hash we mint gets recorded here so the mock can emit a
+# consistent `tx842_samplehash_tumour_lesion_map.tsv`. Normals are not in the
+# release mapping file, so we don't record them.
+_HASH_LEDGER: list[dict] = []
+
+
+def _record_tumour_sample(sample_name_hash: str, spec: "TumourSpec", lesion_ordinal: int) -> None:
+    """Append a mapping-file row for a freshly-minted tumour sample hash."""
+    sh = sample_name_hash.rsplit("--", 1)[-1]
+    _HASH_LEDGER.append(
+        {
+            "sample_hash": sh,
+            "patient_id": spec.patient_id,
+            "patient_tumour": spec.tumour_id_muttable,
+            "lesion": f"lesion{lesion_ordinal}",
+            "histology_group": spec.histology_group,
+        }
+    )
 
 # --- Fixed gene panel (chr:pos ranges chosen to look hg19-ish) ---------------
 # Each gene gets a fake 1kb coding region on chr10 / chr17 etc. Keep it tiny so
@@ -292,10 +312,11 @@ def _write_muttable(specs: list[TumourSpec]) -> None:
     rows = []
     for spec in specs:
         muts = _mutations_for(spec)
-        sample_ids = [
-            f"{spec.patient_id}_SU_T{spec.tumour_ordinal}-R{i + 1}--{RNG.randbytes(6).hex()}"
-            for i in range(spec.n_samples)
-        ]
+        sample_ids = []
+        for i in range(spec.n_samples):
+            s = f"{spec.patient_id}_SU_T{spec.tumour_ordinal}-R{i + 1}--{RNG.randbytes(6).hex()}"
+            sample_ids.append(s)
+            _record_tumour_sample(s, spec, lesion_ordinal=i + 1)
         gl = f"{spec.patient_id}_BS_GL--{RNG.randbytes(6).hex()}"
 
         for m in muts:
@@ -788,6 +809,7 @@ def _write_kallisto(specs: list[TumourSpec]) -> None:
             s = f"{spec.patient_id}_SU_T{spec.tumour_ordinal}-R{r}--{h}"
             sample_columns.append(s)
             tumour_sample_map[s] = spec
+            _record_tumour_sample(s, spec, lesion_ordinal=r)
 
     # Normal samples (patient-level, one per selected patient).
     normal_samples_by_patient: dict[str, str] = {}
@@ -862,9 +884,9 @@ def _write_clone_proportions(specs: list[TumourSpec]) -> None:
         sample_ids: list[str] = []
         for r in range(1, spec.n_samples + 1):
             h = RNG.randbytes(6).hex()
-            sample_ids.append(
-                f"{spec.patient_id}_SU_T{spec.tumour_ordinal}-R{r}--{h}"
-            )
+            s = f"{spec.patient_id}_SU_T{spec.tumour_ordinal}-R{r}--{h}"
+            sample_ids.append(s)
+            _record_tumour_sample(s, spec, lesion_ordinal=r)
 
         clone_names = [c.name for c in spec.clones]
         # proportions[sample_idx][clone_idx] → float
@@ -917,6 +939,7 @@ def _write_purity_ploidy(specs: list[TumourSpec]) -> None:
         for r in range(1, spec.n_samples + 1):
             h = RNG.randbytes(6).hex()
             sample_hash = f"{spec.patient_id}_SU_T{spec.tumour_ordinal}-R{r}--{h}"
+            _record_tumour_sample(sample_hash, spec, lesion_ordinal=r)
             # Plausible mock values: purity ~ U(0.2, 0.95); ploidy ~ 2.0 for
             # no_wgd, ~4.0 for clonal_wgd, otherwise ~3.5. Add a touch of noise.
             if spec.class_ == "clonal_wgd":
@@ -929,6 +952,29 @@ def _write_purity_ploidy(specs: list[TumourSpec]) -> None:
             lines.append(f'"{sample_hash}",{purity},{ploidy}')
     out.write_text("\n".join(lines) + "\n")
     print(f"wrote {out}")
+
+
+def _write_sample_hash_map() -> None:
+    """Emit `nemo_mock/mapping_files/tx842_samplehash_tumour_lesion_map.tsv`.
+
+    Draws from `_HASH_LEDGER`, which collects every tumour-sample hash minted
+    across the other mock emitters so the mapping is consistent with every
+    other table (each table generates its own hash set, but all of them land
+    in the ledger alongside their patient / tumour / lesion metadata).
+    """
+    SAMPLE_MAP_DIR.mkdir(parents=True, exist_ok=True)
+    out = SAMPLE_MAP_DIR / "tx842_samplehash_tumour_lesion_map.tsv"
+    header = ["sample_hash", "patient_id", "patient_tumour", "lesion", "histology_group"]
+    lines = ["\t".join(header)]
+    seen: set[str] = set()
+    for row in _HASH_LEDGER:
+        sh = row["sample_hash"]
+        if sh in seen:
+            continue
+        seen.add(sh)
+        lines.append("\t".join(str(row[k]) for k in header))
+    out.write_text("\n".join(lines) + "\n")
+    print(f"wrote {out} ({len(lines) - 1} sample hashes)")
 
 
 def _write_cohort_manifest(specs: list[TumourSpec]) -> None:
@@ -982,6 +1028,7 @@ def main() -> None:
     _write_kallisto(specs)
     _write_clone_proportions(specs)
     _write_purity_ploidy(specs)
+    _write_sample_hash_map()
     _write_cohort_manifest(specs)
     print("done.")
     print(

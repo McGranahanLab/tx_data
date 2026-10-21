@@ -247,6 +247,21 @@ sources:
       script can parse (patient, tumour_ordinal, region) back out and
       derive canonical `tumour_id`.
 
+  sample_hash_map:
+    relative_path: mapping_files/tx842_samplehash_tumour_lesion_map.tsv
+    format: tsv
+    header: true
+    received: 2026-10-21
+    received_via: User (Discord) supplied Nemo path + 2-row head
+    notes: |
+      Authoritative crosswalk between opaque `sample_hash` (the suffix after
+      `--` in `sample_name_hash`) and canonical identifiers:
+        sample_hash, patient_id, patient_tumour, lesion, histology_group.
+      Consumed by `tx_data.sample_map` so build scripts can look up a
+      sample's tumour / lesion without regexing name tokens. Covers tumour
+      samples only — normals / buffy coats are not in this file; detect
+      them via the `_N<n>` substring in the sample identifier.
+
   conipher_trees:
     relative_path: tx842_trees.RDS                     # resolves against source_root_default
     format: rds                                        # R-native serialized object; loader uses R subprocess

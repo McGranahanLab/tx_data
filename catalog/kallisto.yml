@@ -5,15 +5,13 @@ description: |
   genes, columns are sample identifiers.
 
   Includes both tumour and matched-normal samples in a single file. Normal
-  samples are identified by `_N01` in their sample identifier (e.g.
-  `LTX1358_SU_N01--<hash>`); tumour samples have `_T{n}-R{n}` (e.g.
-  `LTX1365_SU_T1-R4--<hash>`).
-
-  Sample identifier convention matches `muttable.sample_name_hash` (includes
-  trailing `--<hash>`) — direct join, no normalisation needed.
-
-  The loader pivots wide → long into `(sample_name_hash, gene_id, counts, tpm)`
-  grain and emits a paired-normals view keyed by `patient_id`.
+  samples are identified by `_N<n>` in their sample identifier (e.g.
+  `LTX1358_SU_N01--<hash>`) — the reliable normal signal per User
+  (2026-10-21). For tumour samples the build script looks up the hash
+  suffix (after `--`) in `sample_hash_map` to obtain canonical
+  `patient_id`, `patient_tumour`, `lesion`, and `histology_group`; for
+  normals, `patient_id` is extracted from the leading `(LTX|CRUK)<digits>`
+  prefix and the tumour-level columns are null.
 
 provenance:
   cohort: TRACERx 842 (Tx842) — mets RNA-seq release
@@ -23,6 +21,13 @@ provenance:
   received: 2026-09-03
   received_via: paths + schema summary sent by User (files not yet inspected)
   canonical_format: Parquet, long (after build script)
+  schema_evolution: |
+    2026-10-21 — switched from regex-based parsing of sample column names
+    to explicit `sample_hash_map` lookup for tumour samples. Normal
+    detection still uses the `_N<n>` substring (reliable per User).
+    Dropped derived columns `sample_type`, `region_code`, `tumour_ordinal`,
+    `region_ordinal` in favour of `patient_tumour`, `lesion`,
+    `histology_group` sourced directly from the mapping.
 
 primary_key:
   - sample_name_hash
@@ -31,16 +36,16 @@ primary_key:
 grain_source: one row per gene (wide format — sample columns are variable)
 grain_canonical: one row per (sample × gene) after wide → long pivot
 
-genome_build: hg19    # Tx842 default; verify from any gene-annotation companion file when we have one
+genome_build: hg19
 
 joins:
   muttable:
     on:
       - "kallisto.sample_name_hash = muttable.sample_name_hash"
     notes: |
-      Direct join — kallisto's column headers preserve the same
-      `LTX{patient}_{SU|BS}_{T{n}-R{n} | N01}--{hash}` format that muttable's
-      `sample_name_hash` uses. Filter tumour vs normal via `is_normal`.
+      Direct join — kallisto's column headers preserve the full
+      `sample_name_hash` form that muttable uses. Filter tumour vs normal
+      via `is_normal`.
 
   clinical:
     on:
@@ -49,96 +54,73 @@ joins:
       For per-histology expression baselines. Use `is_normal == True` to build
       cohort-wide normal reference, or `is_normal == False` for cohort tumours.
 
+  sample_hash_map:
+    on:
+      - "last token of kallisto.sample_name_hash (after `--`) = sample_hash_map.sample_hash"
+    notes: "Used by the build step to resolve tumour samples. Normals are not in the mapping."
+
 filters_of_interest:
   tumour_only:  "is_normal == False"
   normal_only:  "is_normal == True"
   expressed:    "tpm >= 1.0"
 
-derived_columns:
-  # Parsed from sample column names by the loader.
-  - name: patient_id
-    description: "First 7 chars of the sample name (e.g. `LTX1365`)."
-    rule: "sample_name.split('_')[0]"
-  - name: sample_type
-    description: "`SU` for surgical, `BS` for blood. Parsed from sample name."
-    rule: "sample_name.split('_')[1]"
-  - name: region_code
-    description: "`T1-R4`, `T2-R1`, or `N01` — everything between `_{SU|BS}_` and `--`."
-    rule: "sample_name.split('_')[2].split('--')[0]"
-  - name: is_normal
-    description: "`True` if `region_code` matches `/^N\\d+$/` (e.g. `N01`)."
-    rule: "region_code.startswith('N')"
-  - name: tumour_ordinal
-    description: "For tumour samples, `T{n}` → int. NULL for normals."
-    rule: "int(region_code.split('-')[0][1:]) if is_tumour else NULL"
-  - name: region_ordinal
-    description: "For tumour samples, `R{n}` → int. NULL for normals."
-    rule: "int(region_code.split('-')[1][1:]) if is_tumour else NULL"
-
 canonical_output_layout:
   long_table:
     columns:
       - sample_name_hash   # original wide-format column name, unchanged
-      - patient_id         # parsed
-      - sample_type        # SU / BS
-      - region_code        # T1-R1 / N01 / ...
-      - is_normal
-      - tumour_ordinal     # int or null
-      - region_ordinal     # int or null
-      - gene_id            # from the `gene_id` column in the wide table
-      - counts             # kallisto est_counts
-      - tpm                # kallisto TPM
+      - patient_id         # from mapping (tumours) or name prefix (normals)
+      - patient_tumour     # from mapping (tumour-id, canonicalised); null for normals
+      - lesion             # from mapping; null for normals
+      - histology_group    # from mapping; null for normals
+      - is_normal          # True iff `_N<n>` substring present
+      - gene_id
+      - counts
+      - tpm
     grain: one row per (sample × gene)
 
-  # Optional secondary view produced by the loader for convenient
-  # patient-level tumour/normal matching.
   paired_normals_view:
     columns:
       - patient_id
-      - sample_name_hash    # the normal sample's hash for this patient
+      - sample_name_hash
       - gene_id
       - tpm_normal
-    grain: one row per (patient × gene) for patients with ≥1 N01 sample
+    grain: one row per (patient × gene) for patients with ≥1 normal sample
 
 columns:
-  # Post-pivot canonical schema (what the loader emits).
   - name: sample_name_hash
     type: VARCHAR
     description: |
       Full hashed sample identifier — the column header from the source wide
-      table, kept verbatim (e.g. `LTX1365_SU_T1-R4--63776047a0499a1f7dc4c3b5e8b2cc32`).
-      Joins directly to `muttable.sample_name_hash`.
+      table, kept verbatim. Joins directly to `muttable.sample_name_hash`.
     null_semantics: not_applicable
 
   - name: patient_id
     type: VARCHAR
-    description: "Parsed patient ID (e.g. `LTX1365`)."
+    description: |
+      Patient identifier. For tumour samples sourced from the mapping; for
+      normal samples parsed from the leading `(LTX|CRUK)<digits>` prefix.
     derived: true
 
-  - name: sample_type
+  - name: patient_tumour
     type: VARCHAR
-    description: "`SU` (surgical) or `BS` (blood). Parsed from sample name."
+    description: |
+      Canonical per-tumour identifier for tumour samples (e.g.
+      `LTX0001-Tumour1`, after `apply_convention_scalar`). NULL for normals.
     derived: true
-    allowed_values: [SU, BS]
 
-  - name: region_code
+  - name: lesion
     type: VARCHAR
-    description: "`T1-R4`, `T2-R1`, `N01`, etc. Parsed from sample name."
+    description: "Lesion label from the mapping (e.g. `lesion1`). NULL for normals."
+    derived: true
+
+  - name: histology_group
+    type: VARCHAR
+    description: "Histology label from the mapping (e.g. `LUAD`, `LUSC`). NULL for normals."
     derived: true
 
   - name: is_normal
     type: BOOLEAN
-    description: "True for normal samples (`region_code` starts with `N`)."
-    derived: true
-
-  - name: tumour_ordinal
-    type: INTEGER
-    description: "For tumour samples, the tumour ordinal within the patient. NULL for normals."
-    derived: true
-
-  - name: region_ordinal
-    type: INTEGER
-    description: "For tumour samples, the region ordinal. NULL for normals."
+    description: "True iff `_N<n>` substring present in `sample_name_hash`."
     derived: true
 
   - name: gene_id
@@ -165,15 +147,18 @@ relationships:
   - column: patient_id
     references: clinical.Patient_ID
   - column: gene_id
-    references: genes.ensembl_gene_id      # TBC — depends on gene_id namespace
+    references: genes.ensembl_gene_id
 
 scope_notes: |
   Two source files (counts + TPM) are combined by the builder into a single
   long canonical Parquet. Both source files are assumed to have identical
   gene and sample sets — the builder hard-fails if they diverge.
 
+  Non-normal samples absent from `sample_hash_map` raise — unexpected shape
+  wants a human decision rather than a silent drop.
+
 open_questions:
   - "Is `gene_id` Ensembl (`ENSG…`) or HGNC symbol? Determined on first real build."
   - "Any samples in kallisto not present in muttable / wgd_calls (e.g. RNA-only patients)?"
-  - "How many patients have a paired `_N01` normal? Affects fallback for the expression posterior update."
+  - "How many patients have a paired normal sample? Affects fallback for the expression posterior update."
   - "Are transcript-level results available (kallisto's native output), or only gene-level (this file)? If both, worth cataloging separately."

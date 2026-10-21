@@ -1,9 +1,12 @@
 """Build purity_ploidy → canonical Parquet.
 
-Source is a flat CSV keyed by `sample_name_hash`. The build script parses
-the hash into canonical `tumour_id` + `region` so the table joins directly
-against every other per-tumour table while preserving the original hash
-for lossless joins against muttable + kallisto.
+Source is a flat CSV keyed by `sample_name_hash`. The build script looks
+each hash up in `sample_hash_map` to derive canonical `tumour_id` + `lesion`
+so the table joins directly against every other per-tumour table while
+preserving the original hash for lossless joins against muttable + kallisto.
+
+Samples not present in the mapping (typically normals / buffy coats) are
+dropped — purity/ploidy only applies to tumour tissue.
 """
 
 from __future__ import annotations
@@ -12,40 +15,10 @@ import polars as pl
 
 from tx_data.builds._base import canonical_output_path, log
 from tx_data.ids import apply_convention_scalar
+from tx_data.sample_map import extract_hash_suffix, lookup
 from tx_data.sources import resolve_source
 
 TABLE = "purity_ploidy"
-
-_SAMPLE_RE = (
-    r"^(?P<prefix>LTX|CRUK)"
-    r"(?P<patient_digits>\d+)"
-    r"_SU_T(?P<tumour_ordinal>\d+)"
-    r"-R(?P<region>\d+)"
-    r"--(?P<hash>[a-z0-9]+)$"
-)
-
-
-def _derive_tumour_id(sample_hash: str) -> str:
-    import re
-
-    m = re.match(_SAMPLE_RE, sample_hash)
-    if m is None:
-        raise ValueError(
-            f"sample_name_hash does not match expected pattern "
-            f"'<LTX|CRUK>#_SU_T#-R#--<hash>': {sample_hash!r}"
-        )
-    patient = f"{m.group('prefix')}{m.group('patient_digits')}"
-    ordinal = int(m.group("tumour_ordinal"))
-    return apply_convention_scalar(f"{patient}-Tumour{ordinal}")
-
-
-def _derive_region(sample_hash: str) -> str:
-    import re
-
-    m = re.match(_SAMPLE_RE, sample_hash)
-    if m is None:
-        raise ValueError(f"sample_name_hash parse failed: {sample_hash!r}")
-    return f"R{int(m.group('region'))}"
 
 
 def build() -> pl.DataFrame:
@@ -62,18 +35,43 @@ def build() -> pl.DataFrame:
             f"got {df.columns!r}"
         )
 
+    unique_hashes = df.get_column("sample_name_hash").unique().to_list()
+    tumour_ids: dict[str, str] = {}
+    lesions: dict[str, str] = {}
+    for sh in unique_hashes:
+        try:
+            extract_hash_suffix(sh)
+        except ValueError as exc:
+            raise ValueError(
+                f"purity_ploidy: cannot parse sample_name_hash {sh!r}: {exc}"
+            ) from exc
+        rec = lookup(sh)
+        if rec is None:
+            continue
+        tumour_ids[sh] = apply_convention_scalar(rec.patient_tumour)
+        lesions[sh] = rec.lesion
+
     df = df.with_columns(
         [
-            pl.col("sample_name_hash")
-            .map_elements(_derive_tumour_id, return_dtype=pl.String)
-            .alias("tumour_id"),
-            pl.col("sample_name_hash")
-            .map_elements(_derive_region, return_dtype=pl.String)
-            .alias("region"),
+            pl.col("sample_name_hash").replace_strict(
+                tumour_ids, default=None, return_dtype=pl.String
+            ).alias("tumour_id"),
+            pl.col("sample_name_hash").replace_strict(
+                lesions, default=None, return_dtype=pl.String
+            ).alias("lesion"),
             pl.col("purity").cast(pl.Float64),
             pl.col("ploidy").cast(pl.Float64),
         ]
     )
+
+    unmapped = df.filter(pl.col("tumour_id").is_null())
+    if unmapped.height:
+        log(
+            f"skipping {unmapped.height} sample(s) not in sample_hash_map "
+            f"(likely non-tumour); first: "
+            f"{unmapped.get_column('sample_name_hash').head(3).to_list()}"
+        )
+        df = df.filter(pl.col("tumour_id").is_not_null())
 
     dupes = df.group_by("sample_name_hash").len().filter(pl.col("len") > 1)
     if dupes.height:
@@ -82,16 +80,16 @@ def build() -> pl.DataFrame:
             f"First offenders: {dupes.head(5).to_dicts()}"
         )
 
-    tr_dupes = df.group_by(["tumour_id", "region"]).len().filter(pl.col("len") > 1)
-    if tr_dupes.height:
+    tl_dupes = df.group_by(["tumour_id", "lesion"]).len().filter(pl.col("len") > 1)
+    if tl_dupes.height:
         raise ValueError(
-            f"purity_ploidy: {tr_dupes.height} duplicate (tumour_id, region) rows. "
-            f"First offenders: {tr_dupes.head(5).to_dicts()}"
+            f"purity_ploidy: {tl_dupes.height} duplicate (tumour_id, lesion) rows. "
+            f"First offenders: {tl_dupes.head(5).to_dicts()}"
         )
 
     out_df = df.select(
-        ["tumour_id", "region", "sample_name_hash", "purity", "ploidy"]
-    ).sort(["tumour_id", "region"])
+        ["tumour_id", "lesion", "sample_name_hash", "purity", "ploidy"]
+    ).sort(["tumour_id", "lesion"])
 
     out = canonical_output_path(TABLE)
     out_df.write_parquet(out)

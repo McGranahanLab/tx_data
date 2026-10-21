@@ -1,0 +1,72 @@
+name: sample_hash_map
+description: |
+  Authoritative crosswalk between the opaque `sample_hash` suffix and
+  canonical per-sample identifiers. Loaded by `tx_data.sample_map`;
+  consumed by any build that would otherwise regex-parse name tokens
+  (currently: `purity_ploidy`, `kallisto`).
+
+  The hash column stores the suffix after `--` in a full
+  `sample_name_hash` string. Every tumour sample across the Tx842 release
+  appears here exactly once. Normal samples (buffy coats, matched
+  normals) are not represented — detect them separately (e.g. the `_N<n>`
+  substring in kallisto sample columns).
+
+provenance:
+  cohort: TRACERx 842 (Tx842)
+  hpc_source: /nemo/project/proj-tracerx-lung/tctProjects/lungTx/Tx842/release/tracerx_842/mapping_files/tx842_samplehash_tumour_lesion_map.tsv
+  format_on_source: TSV, header row
+  received: 2026-10-21
+  received_via: User (Discord) supplied Nemo path + 2-row head
+  canonical_format: TSV (consumed in place; no build step)
+
+primary_key:
+  - sample_hash
+
+grain: one row per tumour sample
+
+columns:
+  - name: sample_hash
+    type: VARCHAR
+    description: |
+      Opaque per-sample identifier — the suffix after `--` in a full
+      `sample_name_hash` string. Alphanumeric; no fixed length or
+      alphabet guarantee (real values include non-hex characters).
+    null_semantics: not_applicable
+
+  - name: patient_id
+    type: VARCHAR
+    description: "Patient identifier (e.g. `LTX0287`)."
+    null_semantics: not_applicable
+
+  - name: patient_tumour
+    type: VARCHAR
+    description: |
+      Tumour identifier in muttable spelling (e.g. `LTX0287_tumour1`).
+      Callers typically pass this through
+      `tx_data.ids.apply_convention_scalar` to obtain the configured
+      canonical form (`LTX0287-Tumour1` by default).
+    null_semantics: not_applicable
+
+  - name: lesion
+    type: VARCHAR
+    description: "Lesion label within the tumour (e.g. `lesion1`)."
+    null_semantics: not_applicable
+
+  - name: histology_group
+    type: VARCHAR
+    description: "Histology label (e.g. `LUAD`, `LUSC`)."
+    null_semantics: not_applicable
+
+relationships:
+  - column: sample_hash
+    references: "last token (after `--`) of {muttable,purity_ploidy,kallisto}.sample_name_hash"
+  - column: patient_id
+    references: clinical.Patient_ID
+  - column: patient_tumour
+    references: wgd_calls.tumour_id
+
+scope_notes: |
+  Consumed in place — no canonical Parquet build step. The mapping is
+  deliberately source-of-truth: if a future release changes the hash
+  alphabet or the surrounding name tokens, this file is the one place
+  the pipeline needs to see the new rows.

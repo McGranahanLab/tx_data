@@ -4,14 +4,11 @@ description: |
   samples. One row per sequencing region. Values match whatever upstream
   QC pipeline produced them (likely ASCAT or Battenberg on WGS).
 
-  The source carries only an opaque `sample_name_hash` column keyed to the
-  same sample-id convention as `muttable.sample_name_hash` and the kallisto
-  sample columns:
-      <LTX|CRUK><digits>_SU_T<tumour_ordinal>-R<region>--<hash>
-  e.g. `LTX0001_SU_T1-R1--6ecf51f11b1b`.
-  The build script parses this into canonical (`tumour_id`, `region`) so
-  the table joins directly against every other per-tumour table while
-  preserving the original hash for lossless joins to muttable + kallisto.
+  The source carries only an opaque `sample_name_hash` column. The build
+  script resolves each hash via `sample_hash_map` to obtain canonical
+  `tumour_id` + `lesion`; the hash suffix (after `--`) is the stable join
+  key against the mapping table. Samples absent from the mapping
+  (typically normals / buffy coats) are dropped.
 
 provenance:
   cohort: TRACERx 842 (Tx842)
@@ -21,6 +18,11 @@ provenance:
   received_via: User (Discord) supplied Nemo path + 2-row head
   canonical_format: Parquet (after build script)
   pipeline: upstream per-sample QC (ASCAT / Battenberg on WGS, TBC)
+  schema_evolution: |
+    2026-10-21 — switched from regex-based parsing of `sample_name_hash`
+    to explicit `sample_hash_map` lookup (brittle: hashes contain
+    non-hex chars, `_SU_T` is not universally present). Output column
+    `region` renamed to `lesion` to reflect the mapping's semantics.
 
 primary_key:
   - sample_name_hash
@@ -37,45 +39,48 @@ joins:
   wgd_calls:
     on:
       - "purity_ploidy.tumour_id = wgd_calls.tumour_id"
-    notes: "Per-tumour join; purity_ploidy's finer per-region grain is averaged / selected downstream."
+    notes: "Per-tumour join; purity_ploidy's finer per-lesion grain is averaged / selected downstream."
   kallisto:
     on:
       - "purity_ploidy.sample_name_hash = kallisto sample column name"
+  sample_hash_map:
+    on:
+      - "last token of purity_ploidy.sample_name_hash (after `--`) = sample_hash_map.sample_hash"
+    notes: "Used by the build step to derive tumour_id + lesion."
 
 id_normalisation:
   tumour_id:
     canonical: "LTX0001-Tumour1"
     source_coercions:
-      - "parse 'LTX0001_SU_T1-R1--…' prefix → LTX0001 + ordinal 1 → canonical via tx_data.ids"
-  region:
-    canonical: "R1"
+      - "sample_hash_map.patient_tumour (e.g. `LTX0001_tumour1`) → canonical via tx_data.ids"
+  lesion:
+    canonical: "lesion1"
     source_coercions:
-      - "parse '…-R<n>--…' → 'R<n>'"
+      - "sample_hash_map.lesion verbatim"
 
 columns:
   - name: sample_name_hash
     type: VARCHAR
     description: |
-      Opaque per-sample identifier verbatim from source. Format:
-      `<LTX|CRUK><digits>_SU_T<tumour_ordinal>-R<region>--<hash>`.
-      Primary key for this table; also the join key against
-      `muttable.sample_name_hash` and the kallisto sample columns.
+      Opaque per-sample identifier verbatim from source. Only guaranteed
+      structure is `<LTX|CRUK><digits>_..._--<hash>`; the hash suffix
+      after `--` is the join key against `sample_hash_map.sample_hash`.
     null_semantics: not_applicable
 
   - name: tumour_id
     type: VARCHAR
     description: |
-      Canonical per-tumour identifier derived from `sample_name_hash`
-      (e.g. `LTX0001-Tumour1`). Shared across every tx_data per-tumour
-      table.
+      Canonical per-tumour identifier derived from `sample_hash_map` via
+      `apply_convention_scalar(patient_tumour)` (e.g. `LTX0001-Tumour1`).
+      Shared across every tx_data per-tumour table.
     null_semantics: not_applicable
 
-  - name: region
+  - name: lesion
     type: VARCHAR
     description: |
-      Within-tumour region label, e.g. `R1`, `R2`. Derived from the
-      `-R<n>--` segment of `sample_name_hash`. Not globally unique on its
-      own — only `(tumour_id, region)` or `sample_name_hash` is.
+      Within-tumour lesion label from the mapping (e.g. `lesion1`,
+      `lesion2`). Not globally unique on its own — only
+      `(tumour_id, lesion)` or `sample_name_hash` is.
     null_semantics: not_applicable
 
   - name: purity
@@ -101,10 +106,10 @@ relationships:
     references: wgd_calls.tumour_id
 
 scope_notes: |
-  Grain is per-sample (region-level), not per-tumour. A multi-region tumour
-  has one row per region, each with its own purity and ploidy. For
+  Grain is per-sample (lesion-level), not per-tumour. A multi-region tumour
+  has one row per lesion, each with its own purity and ploidy. For
   tumour-level rollups the caller chooses the aggregation rule (mean / max
-  purity, representative region, etc.) — the build script does not pre-aggregate.
+  purity, representative lesion, etc.) — the build script does not pre-aggregate.
 
 open_questions:
   - "Which upstream caller produced these — ASCAT, Battenberg, Purple, or a consensus?"
