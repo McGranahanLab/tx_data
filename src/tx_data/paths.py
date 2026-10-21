@@ -95,10 +95,17 @@ def build_root_for_mode(mode: str | None) -> Path | None:
 def _alt_root(alias: str, alt_source_roots: Mapping[str, str]) -> Path:
     """Resolve an alt-source-root alias to an absolute path.
 
+    Special alias ``in_repo`` resolves against ``REPO_ROOT`` directly — for
+    cohort-independent static reference data (hg19 UCSC tables etc.) that
+    we commit alongside the code rather than hunting on each cluster.
+
     On the HPC the alias maps to an absolute path from ``_sources.yml``.
     Locally we substitute the mock tree (``nemo_mock/alt/<alias>/``) so
     the same table can be built either way.
     """
+    if alias == "in_repo":
+        return REPO_ROOT
+
     root = data_root()
     if root == DEFAULT_MOCK_ROOT or (root.is_dir() and (root / "alt" / alias).exists()):
         return root / "alt" / alias

@@ -35,6 +35,11 @@ def _resolve(entry: dict, cohort_root: str, alt_roots: dict[str, str]) -> str | 
     root_alias = entry.get("source_root")
     if root_alias is None:
         root = cohort_root
+    elif root_alias == "in_repo":
+        # Static reference data committed directly in tx_data; catalog
+        # documents the upstream origin (URLs) rather than a mirrored path,
+        # so skip equality-vs-catalog here.
+        return None
     elif root_alias in alt_roots:
         root = alt_roots[root_alias]
     else:

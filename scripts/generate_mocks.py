@@ -698,8 +698,17 @@ def _pick_alpaca_cn(spec: TumourSpec, clone: Clone, chrom: str) -> tuple[int, in
     # Root clones (parent="diploid") stay at baseline; only descendants drift.
     # Skips hotspot overrides so those stay deterministic.
     if not hotspot and clone.parent != "diploid":
+        import hashlib
         import random as _random
-        rng = _random.Random(hash((spec.tumour_id_canonical, clone.name, chrom)) & 0xFFFFFFFF)
+
+        # `hash()` is salted per interpreter via PYTHONHASHSEED, so use a
+        # stable digest. Keeps the SCNA-drift sub-RNG deterministic across
+        # separate `python scripts/generate_mocks.py` invocations.
+        seed_bytes = hashlib.blake2s(
+            f"{spec.tumour_id_canonical}|{clone.name}|{chrom}".encode(),
+            digest_size=4,
+        ).digest()
+        rng = _random.Random(int.from_bytes(seed_bytes, "big"))
         # 40% chance of some SCNA event on this (clone, chrom).
         if rng.random() < 0.40:
             event = rng.choices(

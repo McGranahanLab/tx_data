@@ -27,10 +27,10 @@ alt_source_roots:
   # Clinical / QC release tree — sits outside the main tracerx_842 release
   # subtree. Used currently by id_crosswalk; may host more clinical assets.
   tx842_clinical_qc: /nemo/project/proj-tracerx-lung/tctProjects/lungTx/Tx842/clinical_qc/6_release/cohort
-  # Static hg19 reference files (UCSC downloads). Not cohort-specific.
-  # Override on the HPC once a shared static-refs location is picked;
-  # in the mock and for local dev, resolves to nemo_mock/alt/hg19_reference/.
-  hg19_reference: /nemo/project/proj-tracerx-lung/references/hg19
+
+# Special `source_root: in_repo` resolves relative_path against the tx_data
+# repo root. For cohort-independent static reference data (hg19 UCSC tables
+# etc.) that we commit directly rather than hunting on each cluster.
 
 sources:
   muttable:
@@ -178,26 +178,28 @@ sources:
       CRUK-keyed sources (currently: clone_info).
 
   hg19_refgene__refgene:
-    source_root: hg19_reference
-    relative_path: refGene.txt.gz
+    source_root: in_repo
+    relative_path: references/hg19/refGene.txt.gz
     format: tsv_gz
     header: false
     received: 2026-09-23
     notes: |
-      UCSC refGene table for hg19, gzipped, no header. Column order:
+      UCSC refGene table for hg19 (committed directly in tx_data under
+      `references/hg19/`). Gzipped, no header. Column order:
       bin, name, chrom, strand, txStart, txEnd, cdsStart, cdsEnd, exonCount,
       exonStarts, exonEnds, score, name2, cdsStartStat, cdsEndStat, exonFrames.
       Consumed together with `hg19_refgene__cytoband` by the `hg19_refgene`
       builder.
 
   hg19_refgene__cytoband:
-    source_root: hg19_reference
-    relative_path: cytoBand.txt.gz
+    source_root: in_repo
+    relative_path: references/hg19/cytoBand.txt.gz
     format: tsv_gz
     header: false
     received: 2026-09-23
     notes: |
-      UCSC cytoBand table for hg19, gzipped, no header. Column order:
+      UCSC cytoBand table for hg19 (committed directly in tx_data under
+      `references/hg19/`). Gzipped, no header. Column order:
       chrom, chromStart, chromEnd, band_name (e.g. `p36.33`), gie_stain.
 
   seeding_table:
