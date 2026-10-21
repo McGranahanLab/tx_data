@@ -21,7 +21,7 @@ _SAMPLE_RE = (
     r"(?P<patient_digits>\d+)"
     r"_SU_T(?P<tumour_ordinal>\d+)"
     r"-R(?P<region>\d+)"
-    r"--(?P<hash>[a-f0-9]+)$"
+    r"--(?P<hash>[a-z0-9]+)$"
 )
 
 
