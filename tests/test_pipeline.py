@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -19,7 +20,8 @@ def _run(script: Path) -> None:
     r = subprocess.run(
         [sys.executable, str(script)],
         cwd=REPO,
-        env={"PYTHONPATH": str(SRC), "PATH": "/usr/bin:/bin"},
+        # Keep the caller's PATH: the conipher_trees build needs Rscript from the pixi env.
+        env={"PYTHONPATH": str(SRC), "PATH": os.environ.get("PATH", "/usr/bin:/bin")},
         check=True,
         capture_output=True,
     )

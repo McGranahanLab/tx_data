@@ -1,0 +1,35 @@
+{
+  "generator": "scripts/generate_conipher_synthetic.py",
+  "generator_version": 1,
+  "seed": 20261020,
+  "cases": {
+    "SYN001": {
+      "description": "Linear tree, 2 regions, diploid.",
+      "purity": [
+        0.7,
+        0.55
+      ],
+      "ploidy": 2.0,
+      "gained_fraction": 0.0
+    },
+    "SYN002": {
+      "description": "Branching tree, 3 regions, diploid; clone4 is private to R1.",
+      "purity": [
+        0.8,
+        0.6,
+        0.5
+      ],
+      "ploidy": 2.0,
+      "gained_fraction": 0.0
+    },
+    "SYN003": {
+      "description": "Branching tree, 2 regions, clonal gain on chr5/chr8, low purity in R1.",
+      "purity": [
+        0.35,
+        0.8
+      ],
+      "ploidy": 2.12,
+      "gained_fraction": 0.5
+    }
+  }
+}
