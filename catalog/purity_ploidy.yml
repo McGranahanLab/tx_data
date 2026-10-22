@@ -27,7 +27,9 @@ provenance:
 primary_key:
   - sample_name_hash
 
-grain: one row per sequencing region (sample)
+grain: one row per sequencing region (sample). A single lesion can carry
+       multiple samples (multi-region sequencing), so `(tumour_id, lesion)`
+       is NOT unique — only `sample_name_hash` is.
 
 genome_build: hg19
 
@@ -79,8 +81,10 @@ columns:
     type: VARCHAR
     description: |
       Within-tumour lesion label from the mapping (e.g. `lesion1`,
-      `lesion2`). Not globally unique on its own — only
-      `(tumour_id, lesion)` or `sample_name_hash` is.
+      `lesion2`). Can repeat within a tumour: when one lesion is
+      sequenced across multiple regions, each region shows up as a
+      separate row with the same `(tumour_id, lesion)` and distinct
+      `sample_name_hash`. Only `sample_name_hash` is unique on its own.
     null_semantics: not_applicable
 
   - name: purity
@@ -106,10 +110,13 @@ relationships:
     references: wgd_calls.tumour_id
 
 scope_notes: |
-  Grain is per-sample (lesion-level), not per-tumour. A multi-region tumour
-  has one row per lesion, each with its own purity and ploidy. For
-  tumour-level rollups the caller chooses the aggregation rule (mean / max
-  purity, representative lesion, etc.) — the build script does not pre-aggregate.
+  Grain is per-sample (one row per sequencing region), not per-lesion
+  and not per-tumour. A single lesion sequenced across multiple regions
+  contributes several rows, each with the same `(tumour_id, lesion)` and
+  its own `sample_name_hash` + purity + ploidy. For lesion- or
+  tumour-level rollups the caller chooses the aggregation rule (mean /
+  max purity, representative region, etc.) — the build script does not
+  pre-aggregate.
 
 open_questions:
   - "Which upstream caller produced these — ASCAT, Battenberg, Purple, or a consensus?"

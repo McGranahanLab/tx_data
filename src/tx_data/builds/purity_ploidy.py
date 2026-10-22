@@ -80,16 +80,9 @@ def build() -> pl.DataFrame:
             f"First offenders: {dupes.head(5).to_dicts()}"
         )
 
-    tl_dupes = df.group_by(["tumour_id", "lesion"]).len().filter(pl.col("len") > 1)
-    if tl_dupes.height:
-        raise ValueError(
-            f"purity_ploidy: {tl_dupes.height} duplicate (tumour_id, lesion) rows. "
-            f"First offenders: {tl_dupes.head(5).to_dicts()}"
-        )
-
     out_df = df.select(
         ["tumour_id", "lesion", "sample_name_hash", "purity", "ploidy"]
-    ).sort(["tumour_id", "lesion"])
+    ).sort(["tumour_id", "lesion", "sample_name_hash"])
 
     out = canonical_output_path(TABLE)
     out_df.write_parquet(out)
