@@ -19,6 +19,7 @@ normals should do so independently (e.g. the `_N<n>` substring check in
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from functools import lru_cache
 
@@ -27,6 +28,16 @@ import polars as pl
 from tx_data.sources import resolve_source
 
 SOURCE_NAME = "sample_hash_map"
+
+# Stem = everything before `--` in a `sample_name_hash`. For tumour samples
+# that follow the `<LTX|CRUK><digits>_<TYPE>_T<n>-R<n>` convention (reliable
+# for kallisto RNA data per User 2026-10-21), the stem decomposes further.
+_TUMOUR_STEM_RE = re.compile(
+    r"^(?P<patient_id>(?:LTX|CRUK)\d+)"
+    r"_[A-Z]+"
+    r"_T(?P<tumour_ordinal>\d+)"
+    r"-R(?P<region_ordinal>\d+)$"
+)
 
 
 @dataclass(frozen=True)
@@ -40,16 +51,49 @@ class SampleRecord:
 def extract_hash_suffix(sample_name_hash: str) -> str:
     """Return the suffix after `--` in a full `sample_name_hash` string.
 
-    The only guaranteed structure of a sample identifier is
-    `<LTX|CRUK><digits>_..._--<hash>`. Everything before `--` is
-    presentational and varies between releases; the hash suffix is the
-    stable join key against the mapping table.
+    The hash suffix is the DNA join key against `sample_hash_map`.
     """
     if "--" not in sample_name_hash:
         raise ValueError(
             f"sample_name_hash missing '--' hash delimiter: {sample_name_hash!r}"
         )
     return sample_name_hash.rsplit("--", 1)[-1]
+
+
+def extract_sample_stem(sample_name_hash: str) -> str:
+    """Return the stem (everything before `--`) of a `sample_name_hash`.
+
+    DNA and RNA assays of the same biopsy share the same stem but have
+    different hashes, so the stem is the stable RNA↔DNA join key.
+    """
+    if "--" not in sample_name_hash:
+        raise ValueError(
+            f"sample_name_hash missing '--' hash delimiter: {sample_name_hash!r}"
+        )
+    return sample_name_hash.rsplit("--", 1)[0]
+
+
+@dataclass(frozen=True)
+class StemParts:
+    patient_id: str
+    tumour_ordinal: int
+    region_ordinal: int
+
+
+def parse_tumour_stem(stem: str) -> StemParts | None:
+    """Parse a tumour-sample stem into `(patient_id, tumour_ordinal, region_ordinal)`.
+
+    Returns `None` for stems that don't match the tumour pattern — callers
+    should combine with their own normal-detection logic (e.g. `_N<n>`).
+    """
+    m = _TUMOUR_STEM_RE.match(stem)
+    if m is None:
+        return None
+    return StemParts(
+        patient_id=m.group("patient_id"),
+        tumour_ordinal=int(m.group("tumour_ordinal")),
+        region_ordinal=int(m.group("region_ordinal")),
+    )
 
 
 @lru_cache(maxsize=1)
@@ -83,6 +127,34 @@ def _load_map() -> dict[str, SampleRecord]:
     return out
 
 
+@lru_cache(maxsize=1)
+def _tumour_histology_index() -> dict[str, str]:
+    """`patient_tumour → histology_group` index, used for samples not in the
+    mapping by hash (e.g. RNA/kallisto samples, which share a `patient_tumour`
+    with a DNA sample but carry a different hash)."""
+    out: dict[str, str] = {}
+    for rec in _load_map().values():
+        prev = out.get(rec.patient_tumour)
+        if prev is None:
+            out[rec.patient_tumour] = rec.histology_group
+        elif prev != rec.histology_group:
+            raise ValueError(
+                f"sample_hash_map: tumour {rec.patient_tumour!r} carries "
+                f"conflicting histology_group values: {prev!r} vs "
+                f"{rec.histology_group!r}"
+            )
+    return out
+
+
+def lookup_tumour_histology(patient_tumour: str) -> str | None:
+    """Return the histology group recorded against a `patient_tumour`.
+
+    `patient_tumour` must be in the mapping's spelling (`LTX0001_tumour1`),
+    not canonical form — callers should pass the pre-normalised value.
+    """
+    return _tumour_histology_index().get(patient_tumour)
+
+
 def lookup(sample_name_hash: str) -> SampleRecord | None:
     """Return the mapping record for a full `sample_name_hash`, or `None`.
 
@@ -105,3 +177,4 @@ def lookup_strict(sample_name_hash: str) -> SampleRecord:
 def reset_cache() -> None:
     """Clear the cached mapping — call between tests that swap the fixture."""
     _load_map.cache_clear()
+    _tumour_histology_index.cache_clear()

@@ -37,14 +37,18 @@ joins:
   muttable:
     on:
       - "purity_ploidy.sample_name_hash = muttable.sample_name_hash"
-    notes: "Lossless, exact — same hash across both tables."
+    notes: "Lossless, exact — same hash across both tables (both DNA)."
   wgd_calls:
     on:
       - "purity_ploidy.tumour_id = wgd_calls.tumour_id"
     notes: "Per-tumour join; purity_ploidy's finer per-lesion grain is averaged / selected downstream."
   kallisto:
     on:
-      - "purity_ploidy.sample_name_hash = kallisto sample column name"
+      - "purity_ploidy.sample_stem = kallisto.sample_stem"
+    notes: |
+      RNA↔DNA join by sample stem (everything before `--`). The hash
+      suffix differs between RNA and DNA assays of the same biopsy, so
+      `sample_name_hash` cannot be used for this join; the stem can.
   sample_hash_map:
     on:
       - "last token of purity_ploidy.sample_name_hash (after `--`) = sample_hash_map.sample_hash"
@@ -86,6 +90,16 @@ columns:
       separate row with the same `(tumour_id, lesion)` and distinct
       `sample_name_hash`. Only `sample_name_hash` is unique on its own.
     null_semantics: not_applicable
+
+  - name: sample_stem
+    type: VARCHAR
+    description: |
+      Sample identifier with the `--<hash>` suffix stripped (e.g.
+      `LTX0001_SU_T1-R1`). The stable RNA↔DNA join key: DNA and RNA
+      assays of the same biopsy carry different hashes but share the
+      stem. Join `purity_ploidy.sample_stem = kallisto.sample_stem` for
+      per-sample RNA↔DNA matching.
+    derived: true
 
   - name: purity
     type: DOUBLE

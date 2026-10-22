@@ -7,13 +7,16 @@ Two source parquets — counts + TPM — are wide (rows = genes, columns = a
 2. Melts each wide table to long (gene_id, sample_name_hash, value).
 3. Joins them into a single (sample_name_hash × gene_id) table with counts+tpm.
 4. Classifies each sample as normal vs tumour via the `_N<n>` substring
-   (`_N01`, `_N1`, …) in the sample identifier — the reliable normal signal
-   per User (2026-10-21).
-5. For tumour samples, looks up canonical identifiers in `sample_hash_map`:
-   `patient_id`, `patient_tumour`, `lesion`, `histology_group`.
-6. For normal samples, extracts `patient_id` from the leading
-   `(LTX|CRUK)<digits>` prefix (the one piece of the name we're
-   guaranteed) and leaves tumour-level columns null.
+   (`_N01`, `_N1`, …) in the sample identifier — the reliable normal
+   signal per User (2026-10-21).
+5. Parses the sample **stem** (everything before `--`) to recover
+   `patient_id` / `tumour_ordinal` / `region_ordinal`. RNA and DNA share
+   the stem but carry different hashes, so the stem — not the hash — is
+   the RNA↔DNA join key. The stem pattern is reliable for kallisto per
+   User (2026-10-22).
+6. For tumour samples, derives `patient_tumour` (via
+   `apply_convention_scalar`) and `lesion` from the parsed stem; looks
+   up `histology_group` by `patient_tumour` against `sample_hash_map`.
 7. Writes canonical Parquet + a paired-normals view keyed by patient_id.
 """
 
@@ -25,7 +28,11 @@ import polars as pl
 
 from tx_data.builds._base import canonical_output_path, log
 from tx_data.ids import apply_convention_scalar
-from tx_data.sample_map import extract_hash_suffix, lookup
+from tx_data.sample_map import (
+    extract_sample_stem,
+    lookup_tumour_histology,
+    parse_tumour_stem,
+)
 from tx_data.sources import resolve_source
 
 TABLE = "kallisto"
@@ -48,18 +55,18 @@ def _melt_wide(path, value_name: str) -> pl.DataFrame:
 
 
 def _parse_sample(sample_name_hash: str) -> dict:
-    """Return canonical identifier fields for one sample."""
+    """Return canonical identifier fields for one kallisto sample."""
     try:
-        extract_hash_suffix(sample_name_hash)
+        stem = extract_sample_stem(sample_name_hash)
     except ValueError as exc:
         raise ValueError(
             f"kallisto: cannot parse sample_name_hash {sample_name_hash!r}: {exc}"
         ) from exc
 
-    is_normal = bool(_NORMAL_RE.search(sample_name_hash))
+    is_normal = bool(_NORMAL_RE.search(stem))
 
     if is_normal:
-        pm = _PATIENT_RE.match(sample_name_hash)
+        pm = _PATIENT_RE.match(stem)
         if pm is None:
             raise ValueError(
                 f"kallisto: normal sample missing (LTX|CRUK)<digits> prefix: "
@@ -67,6 +74,7 @@ def _parse_sample(sample_name_hash: str) -> dict:
             )
         return dict(
             sample_name_hash=sample_name_hash,
+            sample_stem=stem,
             is_normal=True,
             patient_id=pm.group("patient_id"),
             patient_tumour=None,
@@ -74,21 +82,21 @@ def _parse_sample(sample_name_hash: str) -> dict:
             histology_group=None,
         )
 
-    rec = lookup(sample_name_hash)
-    if rec is None:
-        # Not normal (no `_N<n>`) and not in the map: flag it clearly rather
-        # than silently drop — unexpected shape wants a human decision.
-        raise KeyError(
-            f"kallisto: tumour sample not in sample_hash_map (and not a normal): "
-            f"{sample_name_hash!r}"
+    parts = parse_tumour_stem(stem)
+    if parts is None:
+        raise ValueError(
+            f"kallisto: tumour sample stem does not match "
+            f"'(LTX|CRUK)#_<TYPE>_T#-R#': {sample_name_hash!r}"
         )
+    muttable_tumour_id = f"{parts.patient_id}_tumour{parts.tumour_ordinal}"
     return dict(
         sample_name_hash=sample_name_hash,
+        sample_stem=stem,
         is_normal=False,
-        patient_id=rec.patient_id,
-        patient_tumour=apply_convention_scalar(rec.patient_tumour),
-        lesion=rec.lesion,
-        histology_group=rec.histology_group,
+        patient_id=parts.patient_id,
+        patient_tumour=apply_convention_scalar(muttable_tumour_id),
+        lesion=f"lesion{parts.region_ordinal}",
+        histology_group=lookup_tumour_histology(muttable_tumour_id),
     )
 
 
@@ -128,11 +136,26 @@ def build() -> pl.DataFrame:
 
     long = long.select(
         [
-            "sample_name_hash", "patient_id", "patient_tumour", "lesion",
-            "histology_group", "is_normal",
+            "sample_name_hash", "sample_stem", "patient_id", "patient_tumour",
+            "lesion", "histology_group", "is_normal",
             "gene_id", "counts", "tpm",
         ]
     )
+
+    missing_histology = long.filter(
+        (pl.col("is_normal") == False)  # noqa: E712
+        & pl.col("histology_group").is_null()
+    )
+    if missing_histology.height:
+        unknown_tumours = (
+            missing_histology.get_column("patient_tumour").unique().to_list()
+        )
+        log(
+            f"kallisto: {len(unknown_tumours)} tumour(s) have no matching "
+            f"patient_tumour in sample_hash_map (likely RNA-only patients); "
+            f"histology_group left null for {missing_histology.height} rows. "
+            f"First: {unknown_tumours[:5]}"
+        )
 
     out = canonical_output_path(TABLE)
     long.write_parquet(out)

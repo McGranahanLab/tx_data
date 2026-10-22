@@ -15,7 +15,7 @@ import polars as pl
 
 from tx_data.builds._base import canonical_output_path, log
 from tx_data.ids import apply_convention_scalar
-from tx_data.sample_map import extract_hash_suffix, lookup
+from tx_data.sample_map import extract_hash_suffix, extract_sample_stem, lookup
 from tx_data.sources import resolve_source
 
 TABLE = "purity_ploidy"
@@ -59,6 +59,9 @@ def build() -> pl.DataFrame:
             pl.col("sample_name_hash").replace_strict(
                 lesions, default=None, return_dtype=pl.String
             ).alias("lesion"),
+            pl.col("sample_name_hash")
+            .map_elements(extract_sample_stem, return_dtype=pl.String)
+            .alias("sample_stem"),
             pl.col("purity").cast(pl.Float64),
             pl.col("ploidy").cast(pl.Float64),
         ]
@@ -81,7 +84,7 @@ def build() -> pl.DataFrame:
         )
 
     out_df = df.select(
-        ["tumour_id", "lesion", "sample_name_hash", "purity", "ploidy"]
+        ["tumour_id", "lesion", "sample_stem", "sample_name_hash", "purity", "ploidy"]
     ).sort(["tumour_id", "lesion", "sample_name_hash"])
 
     out = canonical_output_path(TABLE)

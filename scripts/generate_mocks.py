@@ -799,6 +799,11 @@ def _write_kallisto(specs: list[TumourSpec]) -> None:
 
     # Build sample list: for each resolved tumour, N regions; add a normal
     # sample for 60% of patients (deterministic via RNG).
+    # NB: Kallisto (RNA) hashes are intentionally NOT recorded in the
+    # sample_hash_map — the production mapping covers DNA samples only,
+    # and RNA hashes differ from the DNA hash of the same biopsy. The
+    # kallisto builder recovers patient_tumour / lesion from the stem
+    # (part before `--`), which IS shared with DNA.
     sample_columns: list[str] = []
     tumour_sample_map: dict[str, TumourSpec] = {}
     for spec in specs:
@@ -809,7 +814,6 @@ def _write_kallisto(specs: list[TumourSpec]) -> None:
             s = f"{spec.patient_id}_SU_T{spec.tumour_ordinal}-R{r}--{h}"
             sample_columns.append(s)
             tumour_sample_map[s] = spec
-            _record_tumour_sample(s, spec, lesion_ordinal=r)
 
     # Normal samples (patient-level, one per selected patient).
     normal_samples_by_patient: dict[str, str] = {}
