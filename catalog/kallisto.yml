@@ -4,21 +4,23 @@ description: |
   Two matched wide-format matrices: counts and TPM. Same schema — rows are
   genes, columns are sample identifiers.
 
-  Includes both tumour and matched-normal samples in a single file. Normal
-  samples are identified by `_N<n>` in their sample identifier (e.g.
-  `LTX1358_SU_N01--<hash>`) — the reliable normal signal per User
-  (2026-10-21).
+  Includes every tumour-ish sample category the release carries (primary
+  multi-region `_T<n>-R<n>`, lymph-node metastases `_LN<n>`, distant
+  metastases, …) plus matched-normal samples. Normals are identified by
+  the `_N<n>` substring in the sample identifier (reliable per User
+  2026-10-21).
 
-  Kallisto (RNA) hashes do NOT match the DNA hashes in `sample_hash_map`.
-  The stable RNA↔DNA join key is the **stem** — everything before `--`
-  — because RNA and DNA assays of the same biopsy share the stem but
-  carry different hashes. The build parses the stem with a regex (the
-  pattern is reliable for kallisto per User 2026-10-22) to recover
-  `patient_id`, `tumour_ordinal`, and `region_ordinal`; builds
-  `patient_tumour` and `lesion` from them; and looks up
-  `histology_group` by `patient_tumour` against `sample_hash_map`.
-  Normals have `patient_id` extracted from the leading
-  `(LTX|CRUK)<digits>` prefix and all tumour-level columns null.
+  Canonical identifiers are resolved via `sample_hash_map`. The mapping
+  is the source of truth and covers every sample category the release
+  recognises per User (2026-10-23); the build looks each sample up by
+  its hash suffix (after `--`) and takes `patient_id`, `patient_tumour`,
+  `lesion`, and `histology_group` directly from the row. This replaces
+  the earlier stem-regex approach — real samples carry CODE segments
+  the regex could not predict (`_LN02`, …).
+
+  Samples absent from the mapping are kept with tumour-level columns
+  null; the build logs a summary rather than crashing. Normals pass
+  through on the `_N<n>` substring even without a mapping entry.
 
 provenance:
   cohort: TRACERx 842 (Tx842) — mets RNA-seq release
@@ -31,13 +33,17 @@ provenance:
   schema_evolution: |
     2026-10-21 — moved from parsing name tokens to `sample_hash_map`
     lookup for tumour samples. Dropped derived columns `sample_type`,
-    `region_code`, `tumour_ordinal`, `region_ordinal` in favour of
-    `patient_tumour`, `lesion`, `histology_group`.
+    `region_code`, `tumour_ordinal`, `region_ordinal`.
 
-    2026-10-22 — RNA hashes don't match the DNA mapping. Reverted to
-    stem-regex parsing to recover `patient_tumour` + `lesion`, with
-    `histology_group` looked up by `patient_tumour` against the
-    mapping. Added `sample_stem` as an explicit RNA↔DNA join key.
+    2026-10-22 — thought RNA hashes don't match the DNA mapping, so
+    briefly used stem-regex parsing to recover `patient_tumour` +
+    `lesion`. Added `sample_stem` as the RNA↔DNA join key.
+
+    2026-10-23 — confirmed by User that `sample_hash_map` contains
+    every sample we're considering, so returned to direct hash lookup.
+    Hash miss is now non-fatal: tumour-level columns are left null and
+    the build logs a summary. `sample_stem` is retained as the
+    explicit RNA↔DNA join key for downstream per-biopsy matching.
 
 primary_key:
   - sample_name_hash
@@ -53,9 +59,9 @@ joins:
     on:
       - "kallisto.sample_name_hash = muttable.sample_name_hash"
     notes: |
-      Direct join — kallisto's column headers preserve the full
-      `sample_name_hash` form that muttable uses. Filter tumour vs normal
-      via `is_normal`.
+      Direct join when muttable has the same hash as kallisto. RNA and
+      DNA assays of the same biopsy carry different hashes, so for
+      per-biopsy matching use `sample_stem` instead.
 
   clinical:
     on:
@@ -74,27 +80,29 @@ joins:
 
   sample_hash_map:
     on:
-      - "kallisto.patient_tumour (via `apply_convention_scalar` from the mapping's `patient_tumour`)"
+      - "last token of kallisto.sample_name_hash (after `--`) = sample_hash_map.sample_hash"
     notes: |
-      kallisto cannot look up `sample_hash_map` by hash (RNA hashes
-      aren't in it). The build step looks up `histology_group` by
-      `patient_tumour` only; tumour / lesion are derived from the stem.
+      Used by the build step to resolve every canonical column
+      (patient_id, patient_tumour, lesion, histology_group). Hash miss
+      is non-fatal — see `scope_notes`.
 
 filters_of_interest:
   tumour_only:  "is_normal == False"
   normal_only:  "is_normal == True"
   expressed:    "tpm >= 1.0"
+  mapped_only:  "in_sample_map == True"
 
 canonical_output_layout:
   long_table:
     columns:
       - sample_name_hash   # original wide-format column name, unchanged
       - sample_stem        # part before `--`, RNA↔DNA join key
-      - patient_id         # parsed from stem
-      - patient_tumour     # derived from stem, canonicalised; null for normals
-      - lesion             # derived from stem (lesion<region_ordinal>); null for normals
-      - histology_group    # looked up by patient_tumour; null for normals and RNA-only tumours
+      - patient_id         # from mapping, or parsed from stem prefix when missing
+      - patient_tumour     # from mapping (canonicalised); null when missing
+      - lesion             # from mapping; null when missing
+      - histology_group    # from mapping; null when missing
       - is_normal          # True iff `_N<n>` substring present in stem
+      - in_sample_map      # True iff hash suffix was found in sample_hash_map
       - gene_id
       - counts
       - tpm
@@ -113,7 +121,8 @@ columns:
     type: VARCHAR
     description: |
       Full hashed sample identifier — the column header from the source wide
-      table, kept verbatim. Joins directly to `muttable.sample_name_hash`.
+      table, kept verbatim. Joins directly to `muttable.sample_name_hash`
+      when the two share a hash (DNA↔DNA); for RNA↔DNA, use `sample_stem`.
     null_semantics: not_applicable
 
   - name: sample_stem
@@ -125,36 +134,47 @@ columns:
 
   - name: patient_id
     type: VARCHAR
-    description: "Patient identifier parsed from the leading `(LTX|CRUK)<digits>` of the stem."
+    description: |
+      Patient identifier. Taken from `sample_hash_map` when the sample
+      is in the mapping; falls back to the leading `(LTX|CRUK)<digits>`
+      of the stem otherwise.
     derived: true
 
   - name: patient_tumour
     type: VARCHAR
     description: |
-      Canonical per-tumour identifier for tumour samples (e.g.
-      `LTX0001-Tumour1`, after `apply_convention_scalar`). Built from the
-      stem's `_T<ordinal>-R<n>` segment. NULL for normals.
+      Canonical per-tumour identifier for samples found in
+      `sample_hash_map` (`apply_convention_scalar(record.patient_tumour)`;
+      e.g. `LTX0001-Tumour1`). NULL for normals and for samples absent
+      from the mapping.
     derived: true
 
   - name: lesion
     type: VARCHAR
     description: |
-      Lesion label (`lesion<region_ordinal>`) built from the stem's
-      `-R<n>` segment. NULL for normals.
+      Lesion label from `sample_hash_map` (e.g. `lesion1`, or whatever
+      label the release assigns to a metastasis). NULL for normals and
+      for samples absent from the mapping.
     derived: true
 
   - name: histology_group
     type: VARCHAR
     description: |
-      Histology label from `sample_hash_map` looked up by
-      `patient_tumour` (the mapping's `patient_tumour` spelling, pre
-      `apply_convention_scalar`). NULL for normals and for tumours
-      absent from the mapping (RNA-only patients).
+      Histology label from `sample_hash_map` (e.g. `LUAD`, `LUSC`).
+      NULL for normals and for samples absent from the mapping.
     derived: true
 
   - name: is_normal
     type: BOOLEAN
     description: "True iff `_N<n>` substring present in `sample_stem`."
+    derived: true
+
+  - name: in_sample_map
+    type: BOOLEAN
+    description: |
+      True iff the sample's hash suffix was found in `sample_hash_map`.
+      When False, `patient_tumour` / `lesion` / `histology_group` are
+      null — downstream code decides whether to filter these out.
     derived: true
 
   - name: gene_id
@@ -188,11 +208,11 @@ scope_notes: |
   long canonical Parquet. Both source files are assumed to have identical
   gene and sample sets — the builder hard-fails if they diverge.
 
-  Tumour sample stems that don't match the `_T<n>-R<n>` pattern raise —
-  unexpected shape wants a human decision rather than a silent drop. A
-  tumour whose `patient_tumour` isn't in `sample_hash_map` is allowed
-  (RNA-only patients are a documented possibility) — in that case
-  `histology_group` is null and the build logs a summary.
+  Sample identifiers that lack a `--` hash delimiter raise — the shape
+  itself is malformed and wants a human decision. Everything else
+  passes through: samples absent from `sample_hash_map` are kept with
+  tumour-level columns null (`in_sample_map` set to False), and the
+  build logs a summary of normal vs tumour-ish misses.
 
 open_questions:
   - "Is `gene_id` Ensembl (`ENSG…`) or HGNC symbol? Determined on first real build."

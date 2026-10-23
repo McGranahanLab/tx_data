@@ -797,23 +797,45 @@ def _write_kallisto(specs: list[TumourSpec]) -> None:
 
     gene_ids = [g[3] for g in GENES]  # ENSG…
 
-    # Build sample list: for each resolved tumour, N regions; add a normal
-    # sample for 60% of patients (deterministic via RNG).
-    # NB: Kallisto (RNA) hashes are intentionally NOT recorded in the
-    # sample_hash_map — the production mapping covers DNA samples only,
-    # and RNA hashes differ from the DNA hash of the same biopsy. The
-    # kallisto builder recovers patient_tumour / lesion from the stem
-    # (part before `--`), which IS shared with DNA.
+    # Build sample list: for each resolved tumour, N primary regions + an
+    # LN metastasis for every 3rd tumour (exercises the "sample category
+    # the regex can't predict" path). Add a normal sample for 60% of
+    # patients (deterministic via RNG).
+    #
+    # Every tumour-ish RNA hash is registered in the sample_hash_map
+    # ledger, mirroring production where the mapping covers every sample
+    # we are considering (per User 2026-10-23). Normals are intentionally
+    # NOT registered — they are detected via the `_N<n>` substring and
+    # must flow through even when the mapping doesn't know them.
     sample_columns: list[str] = []
     tumour_sample_map: dict[str, TumourSpec] = {}
-    for spec in specs:
-        if spec.status != "resolved":
-            continue
+    for spec_idx, spec in enumerate(s for s in specs if s.status == "resolved"):
         for r in range(1, spec.n_samples + 1):
             h = RNG.randbytes(16).hex()
             s = f"{spec.patient_id}_SU_T{spec.tumour_ordinal}-R{r}--{h}"
             sample_columns.append(s)
             tumour_sample_map[s] = spec
+            _record_tumour_sample(s, spec, lesion_ordinal=r)
+        # One lymph-node metastasis every 3rd tumour.
+        if spec_idx % 3 == 0:
+            h = RNG.randbytes(16).hex()
+            ln_ordinal = (spec_idx // 3) + 1
+            s = (
+                f"{spec.patient_id}_SU_LN{ln_ordinal:02d}--{h}"
+            )
+            sample_columns.append(s)
+            tumour_sample_map[s] = spec
+            # LN entries use a lesion label distinct from primary lesions —
+            # mirror the convention the release might use.
+            _HASH_LEDGER.append(
+                {
+                    "sample_hash": h,
+                    "patient_id": spec.patient_id,
+                    "patient_tumour": spec.tumour_id_muttable,
+                    "lesion": f"LN{ln_ordinal:02d}",
+                    "histology_group": spec.histology_group,
+                }
+            )
 
     # Normal samples (patient-level, one per selected patient).
     normal_samples_by_patient: dict[str, str] = {}
