@@ -43,17 +43,22 @@ def test_columns_and_key(table):
 
 def test_matches_manifest(table):
     m = json.loads(MANIFEST.read_text())
-    # Non-standard names keep the row but get NULL tumour_id / region.
+    # tumour_id always comes from the tumour label; non-standard sample
+    # names only lose `region`.
     expected = {
         s["sample_name_hash"]: (
-            t["tumour_id_canonical"] if s["standard_name"] else None,
+            t["patient_id"],
+            t["tumour_id_canonical"],
+            t["wgs_tumour_label"],
             s["region"] if s["standard_name"] else None,
             s["purity"],
         )
         for t in m["tumours"] for s in t["samples"]
     }
     got = {
-        r["sample_name_hash"]: (r["tumour_id"], r["region"], r["purity"])
+        r["sample_name_hash"]: (
+            r["patient_id"], r["tumour_id"], r["wgs_tumour_label"], r["region"], r["purity"]
+        )
         for r in table.iter_rows(named=True)
     }
     assert got == expected
@@ -70,10 +75,26 @@ def test_paths_normalised_and_resolvable(table):
     assert DEFAULT_MOCK_ROOT in p.parents
 
 
-def test_patient_always_present_and_nonstandard_names_kept(table):
+def test_identity_wes_consistent(table):
     assert table["patient_id"].null_count() == 0
-    assert "LTX0106" in table["patient_id"].to_list()
-    assert table.filter(pl.col("patient_id") == "LTX0106")["tumour_id"].null_count() == 1
+    assert table["tumour_id"].null_count() == 0
+    assert table["tumour_id"].str.contains(r"^LTX\d+-Tumour\d+$").all()
+    assert table["patient_id"].str.contains(r"^LTX\d+$").all()
+    # Multi-tumour patient: suffixed labels; single-tumour: bare patient id.
+    multi = table.filter(pl.col("patient_id") == "LTX0104").sort("tumour_id")
+    assert multi["wgs_tumour_label"].to_list() == ["LTX0104_tumour1", "LTX0104_tumour2"]
+    assert multi["tumour_id"].to_list() == ["LTX0104-Tumour1", "LTX0104-Tumour2"]
+    single = table.filter(pl.col("patient_id") == "LTX0001")
+    assert single["wgs_tumour_label"].to_list() == ["LTX0001"]
+    assert single["tumour_id"].to_list() == ["LTX0001-Tumour1"]
+    # Non-standard sample name keeps label-derived identity, loses region.
+    ln = table.filter(pl.col("patient_id") == "LTX0106")
+    assert ln["tumour_id"].to_list() == ["LTX0106-Tumour1"] and ln["region"].is_null().all()
+
+
+def test_battenberg_dirs_use_tumour_label(table):
+    for label, d in table.select("wgs_tumour_label", "results_dir").iter_rows():
+        assert d.endswith(f"/output/{label}/results"), (label, d)
 
 
 def test_no_rho_psi_columns(table):
@@ -90,8 +111,22 @@ def test_wgs_hashes_disjoint_from_wes_hashes(table):
     assert not wgs_suffixes & set(wes["sample_hash"].cast(pl.String))
 
 
+def test_wgs_tumour_label_parsing():
+    import tx_data.builds  # noqa: F401  (tx_data.ids has a circular import if loaded first)
+    from tx_data.ids import parse_wgs_tumour_label, wgs_tumour_id
+
+    assert wgs_tumour_id("LTX0001") == "LTX0001-Tumour1"
+    assert wgs_tumour_id("LTX0002_tumour1") == "LTX0002-Tumour1"
+    assert wgs_tumour_id("LTX0002_tumour2") == "LTX0002-Tumour2"
+    assert wgs_tumour_id("LTX0002_tumour_2") == "LTX0002-Tumour2"
+    assert parse_wgs_tumour_label("CRUK0001") == ("CRUK0001", 1)
+    for bad in ("LTX0001-Tumour1", "LTX0001_SU_T1", "patient1", ""):
+        with pytest.raises(ValueError):
+            parse_wgs_tumour_label(bad)
+
+
 def test_parse_sample_rejects_unexpected_names():
-    assert inv._parse_sample("LTX0001_SU_T1-R1--38da873ff7") == ("LTX0001", "LTX0001-Tumour1", "R1")
+    assert inv._parse_sample("LTX0001_SU_T1-R1--38da873ff7") == ("LTX0001", 1, "R1")
     for bad in ("LTX0001_SU_LN1--abc", "LTX0001-T1-R1--abc", "LTX0001_SU_T1-R1"):
         with pytest.raises(ValueError):
             inv._parse_sample(bad)

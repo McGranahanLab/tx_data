@@ -4,12 +4,18 @@ Source is a per-sample TSV listing each WGS tumour sample's chosen
 Battenberg solution, purity, ploidy and pointers to the Battenberg results,
 the multi-sample MSAI file and the mosdepth summary.
 
-The WES `sample_hash_map` does not cover WGS samples, so `tumour_id` and
-`region` are parsed best-effort from the sample name. Name tokens are
-unreliable with no closed catalogue, so a name that doesn't follow
-`<patient>_SU_T<n>-R<n>--<hash>` (or whose patient disagrees with
-`PATIENT`) keeps its row with NULL `tumour_id` / `region` and is logged.
-`patient_id` and `sample_name_hash` are always the source values.
+Identity comes from the source `PATIENT` column, which despite its name
+holds a WGS *tumour* label: bare `LTX0001` for a patient's only tumour,
+`LTX0002_tumour1` / `LTX0002_tumour2` for multi-tumour patients (also the
+Battenberg output folder names). The build keeps it verbatim as
+`wgs_tumour_label` and derives WES-consistent `patient_id` and `tumour_id`
+(`LTX0001-Tumour1`) via `tx_data.ids.wgs_tumour_id`. An unrecognised label
+fails the build.
+
+`region` is parsed best-effort from the sample name: name tokens are
+unreliable with no closed catalogue, so it is NULL (and logged) when the
+name doesn't follow `<patient>_SU_T<n>-R<n>--<hash>`. Names whose tokens
+disagree with the label are logged but keep the label-derived identity.
 
 `optimal_solution` is kept verbatim; its psi / rho tokens are not parsed
 into columns because `purity` / `ploidy` are the values to use.
@@ -26,13 +32,13 @@ import re
 import polars as pl
 
 from tx_data.builds._base import canonical_output_path, log
-from tx_data.ids import apply_convention_scalar
+from tx_data.ids import parse_wgs_tumour_label, wgs_tumour_id
 from tx_data.sources import resolve_source
 
 TABLE = "wgs_battenberg_inventory"
 
 SOURCE_RENAMES = {
-    "PATIENT": "patient_id",
+    "PATIENT": "wgs_tumour_label",
     "TUMOUR_SAMPLE": "sample_name_hash",
     "results_dir": "results_dir",
     "optimal_solution": "optimal_solution",
@@ -49,7 +55,7 @@ SAMPLE_RE = re.compile(
 )
 
 OUTPUT_COLUMNS = [
-    "patient_id", "tumour_id", "region", "sample_name_hash",
+    "patient_id", "tumour_id", "wgs_tumour_label", "region", "sample_name_hash",
     "results_dir", "optimal_solution", "subclones_file", "subclones_path",
     "purity", "ploidy", "msai_path", "mosdepth_summary_path", "coverage",
 ]
@@ -62,14 +68,12 @@ def _norm_path(p: str | None) -> str | None:
     return posixpath.normpath(p)
 
 
-def _parse_sample(name: str) -> tuple[str, str, str]:
-    """Return (patient_id, tumour_id, region) from a WGS sample name."""
+def _parse_sample(name: str) -> tuple[str, int, str]:
+    """Return (patient_id, tumour_ordinal, region) from a WGS sample name."""
     m = SAMPLE_RE.match(name)
     if m is None:
         raise ValueError(name)
-    patient = m.group("patient")
-    tumour_id = apply_convention_scalar(f"{patient}_{int(m.group('ordinal'))}")
-    return patient, tumour_id, m.group("region")
+    return m.group("patient"), int(m.group("ordinal")), m.group("region")
 
 
 def build() -> pl.DataFrame:
@@ -91,38 +95,54 @@ def build() -> pl.DataFrame:
         )
     df = df.select(list(SOURCE_RENAMES)).rename(SOURCE_RENAMES)
 
-    # ---- identity: best-effort parse; unparsed samples keep NULL tumour_id ----
-    tumour_ids: dict[str, str | None] = {}
+    # ---- identity: tumour label → patient_id / tumour_id (authoritative) ----
+    labels = df.get_column("wgs_tumour_label").unique().to_list()
+    bad_labels = []
+    for label in labels:
+        try:
+            parse_wgs_tumour_label(label)
+        except (ValueError, TypeError):
+            bad_labels.append(label)
+    if bad_labels:
+        raise ValueError(
+            f"{TABLE}: {len(bad_labels)} PATIENT (tumour label) value(s) not of the form "
+            f"<LTX|CRUK><digits>[_tumour<n>]; first: {bad_labels[:5]}"
+        )
+    df = df.with_columns(
+        pl.col("wgs_tumour_label")
+        .replace_strict({lb: parse_wgs_tumour_label(lb)[0] for lb in labels},
+                        return_dtype=pl.String)
+        .alias("patient_id"),
+        pl.col("wgs_tumour_label")
+        .replace_strict({lb: wgs_tumour_id(lb) for lb in labels}, return_dtype=pl.String)
+        .alias("tumour_id"),
+    )
+
+    # ---- region: best-effort from the sample name ----------------------------
     regions: dict[str, str | None] = {}
     unparsed: list[str] = []
-    mismatched: list[str] = []
-    for patient, name in df.select("patient_id", "sample_name_hash").iter_rows():
+    disagree: list[str] = []
+    for label, name in df.select("wgs_tumour_label", "sample_name_hash").iter_rows():
         try:
-            parsed_patient, tumour_id, region = _parse_sample(name)
+            name_patient, name_ordinal, region = _parse_sample(name)
         except ValueError:
             unparsed.append(name)
-            tumour_ids[name] = regions[name] = None
+            regions[name] = None
             continue
-        if parsed_patient != patient:
-            mismatched.append(name)
-            tumour_ids[name] = regions[name] = None
-            continue
-        tumour_ids[name], regions[name] = tumour_id, region
+        regions[name] = region
+        if (name_patient, name_ordinal) != parse_wgs_tumour_label(label):
+            disagree.append(f"{label} / {name}")
     if unparsed:
         log(
             f"{len(unparsed)} sample name(s) don't match <patient>_SU_T<n>-R<n>--<hash>; "
-            f"tumour_id/region left NULL. First: {unparsed[:5]}"
+            f"region left NULL. First: {unparsed[:5]}"
         )
-    if mismatched:
+    if disagree:
         log(
-            f"{len(mismatched)} sample name(s) disagree with PATIENT; "
-            f"tumour_id/region left NULL. First: {mismatched[:5]}"
+            f"warning: {len(disagree)} sample name(s) whose tokens disagree with the "
+            f"tumour label (label wins). First: {disagree[:5]}"
         )
-
     df = df.with_columns(
-        pl.col("sample_name_hash")
-        .replace_strict(tumour_ids, return_dtype=pl.String)
-        .alias("tumour_id"),
         pl.col("sample_name_hash")
         .replace_strict(regions, return_dtype=pl.String)
         .alias("region"),
@@ -153,7 +173,7 @@ def build() -> pl.DataFrame:
     if out_of_range.height:
         log(f"warning: {out_of_range.height} sample(s) with purity outside (0, 1]")
 
-    out_df = df.select(OUTPUT_COLUMNS).sort(["patient_id", "tumour_id", "region", "sample_name_hash"], nulls_last=True)
+    out_df = df.select(OUTPUT_COLUMNS).sort(["tumour_id", "region", "sample_name_hash"], nulls_last=True)
     out = canonical_output_path(TABLE)
     out_df.write_parquet(out)
     log(f"wrote {out} ({out_df.height} rows × {out_df.width} cols)")

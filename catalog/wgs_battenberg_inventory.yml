@@ -16,7 +16,8 @@ description: |
   (`CN-CCF/battenberg_wgs/output`, symlinked to the run directories).
 
 usage_rules:
-  - "Copy number: use the MSAI profile (`msai_path`) by default, NOT the optimal-solution subclones file (`subclones_path`). MSAI is Battenberg CN corrected for mirrored subclonal allelic imbalance; the optimal solution is uncorrected. Use the subclones file only when the uncorrected profile is explicitly wanted."
+  - "Fractional, sample-level copy number: use the MSAI profile (`msai_path`) by default, NOT the optimal-solution subclones file (`subclones_path`). MSAI is Battenberg CN corrected for mirrored subclonal allelic imbalance; the optimal solution is uncorrected. Use the subclones file only when the uncorrected profile is explicitly wanted."
+  - "Integer, clone-specific copy number: use ALPACA, not this table's files."
   - "Purity / ploidy: use the `purity` and `ploidy` columns. The rho / psi in the `optimal_solution` label are related but different quantities; use them only when explicitly asked (parse the label on the fly)."
 
 provenance:
@@ -37,7 +38,7 @@ genome_build: hg38
 
 source_columns:
   # Source → canonical renames applied by the build.
-  PATIENT: patient_id
+  PATIENT: wgs_tumour_label   # despite the name, a TUMOUR label (see column)
   TUMOUR_SAMPLE: sample_name_hash
   results_dir: results_dir
   optimal_solution: optimal_solution
@@ -60,28 +61,42 @@ joins:
 columns:
   - name: patient_id
     type: VARCHAR
-    description: "Patient identifier (e.g. `LTX0001`), verbatim from source `PATIENT`. Authoritative patient key for WGS."
+    description: "Patient identifier (e.g. `LTX0002`): the `<LTX|CRUK><digits>` prefix of `wgs_tumour_label`."
     null_semantics: not_applicable
+    derived: true
 
   - name: tumour_id
     type: VARCHAR
     description: |
-      Canonical tumour identifier (e.g. `LTX0001-Tumour1`), best-effort
-      from the `_SU_T<n>-R<n>--` tokens of `sample_name_hash`.
+      Canonical tumour identifier, consistent with WES (`LTX0001-Tumour1`;
+      configured `id_convention`). Derived from `wgs_tumour_label` by
+      `tx_data.ids.wgs_tumour_id`: bare `LTX0001` → `LTX0001-Tumour1`,
+      `LTX0002_tumour2` → `LTX0002-Tumour2`.
+    null_semantics: not_applicable
+    derived: true
+
+  - name: wgs_tumour_label
+    type: VARCHAR
+    description: |
+      Source `PATIENT` column verbatim. Despite its name it identifies a
+      TUMOUR: the bare patient id when the patient has one tumour
+      (`LTX0001`, `CRUK0001`), `<patient>_tumour<n>` when they have several
+      (`LTX0002_tumour1`). Same string as the Battenberg output folder name
+      (`battenberg_wgs/output/<label>/`), so keep it for locating files;
+      use `tumour_id` for joins. Unlike WES, single tumours carry no suffix.
+    null_semantics: not_applicable
+    notes: "The build fails on a value that isn't `<LTX|CRUK><digits>` with an optional `_tumour<n>` / `_tumour_<n>` suffix."
+
+  - name: region
+    type: VARCHAR
+    description: "Region label (`R1`, `R2`, ...) parsed best-effort from the `-R<n>--` token of `sample_name_hash`."
     null_semantics: unknown
     derived: true
     notes: |
       Sample-name tokens are unreliable and have no closed catalogue
-      (Piotr, 2026-10-27). NULL when the name doesn't follow the usual
-      pattern, or when the parsed patient disagrees with `PATIENT`. The
-      build logs every such sample. A proper WGS sample → tumour map is TBC.
-
-  - name: region
-    type: VARCHAR
-    description: "Region label (`R1`, `R2`, ...) parsed from the same tokens as `tumour_id`."
-    null_semantics: unknown
-    derived: true
-    notes: "NULL under the same conditions as `tumour_id`."
+      (Piotr, 2026-10-27): NULL when the name doesn't follow
+      `<patient>_SU_T<n>-R<n>--<hash>`. Names whose tokens disagree with
+      `wgs_tumour_label` are logged; the label wins for identity.
 
   - name: sample_name_hash
     type: VARCHAR
@@ -154,6 +169,4 @@ scope_notes: |
   pointers and per-sample scalars; it does not open the referenced files.
   Their contents become separate `wgs_*` tables.
 
-open_questions:
-  - "Is there an authoritative WGS sample → tumour mapping (like WES `sample_hash_map`), so `tumour_id` doesn't rely on name tokens?"
-  - "Battenberg output subdirectories are per tumour — how are multi-tumour patients named (the example dir is the bare patient id `LTX0001`)?"
+open_questions: []

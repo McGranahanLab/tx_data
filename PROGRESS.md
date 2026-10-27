@@ -20,6 +20,11 @@ canonical store + synthetic `nemo_mock/` for local dev. Downstream projects
   WGS mocks come from `scripts/generate_mocks_wgs.py` (own seed, own
   `nemo_mock/_cohort_manifest_wgs.json`). First WGS table:
   `wgs_battenberg_inventory` (2026-10-27).
+- **WGS tumour labels** (2026-10-27): WGS sources (inventory `PATIENT`, Battenberg
+  folder names) label tumours as bare `LTX0001` (single tumour) or
+  `LTX0002_tumour<n>`. Canonical WGS tables standardise to WES form via
+  `tx_data.ids.wgs_tumour_id` (`LTX0001-Tumour1`) and keep the raw string as
+  `wgs_tumour_label` for locating files.
 - **Path resolution**: every root in `_sources.yml` is an absolute `/nemo/...`
   path, re-rooted under `tx_data.paths.nemo_root()` (`TX_NEMO_ROOT` env var,
   then `config/paths.yml` `nemo_root:`, default `nemo_mock/`). `nemo_mock/`

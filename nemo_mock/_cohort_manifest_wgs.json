@@ -9,6 +9,7 @@
       "patient_id": "LTX0001",
       "tumour_ordinal": 1,
       "tumour_id_canonical": "LTX0001-Tumour1",
+      "wgs_tumour_label": "LTX0001",
       "ploidy": 3.86072434911302,
       "n_clones": 1,
       "samples": [
@@ -25,6 +26,7 @@
       "patient_id": "LTX0002",
       "tumour_ordinal": 1,
       "tumour_id_canonical": "LTX0002-Tumour1",
+      "wgs_tumour_label": "LTX0002",
       "ploidy": 1.98,
       "n_clones": 1,
       "samples": [
@@ -41,6 +43,7 @@
       "patient_id": "LTX0003",
       "tumour_ordinal": 1,
       "tumour_id_canonical": "LTX0003-Tumour1",
+      "wgs_tumour_label": "LTX0003",
       "ploidy": 2.1,
       "n_clones": 1,
       "samples": [
@@ -57,6 +60,7 @@
       "patient_id": "LTX0004",
       "tumour_ordinal": 1,
       "tumour_id_canonical": "LTX0004-Tumour1",
+      "wgs_tumour_label": "LTX0004",
       "ploidy": 3.2,
       "n_clones": 3,
       "samples": [
@@ -73,6 +77,7 @@
       "patient_id": "LTX0101",
       "tumour_ordinal": 1,
       "tumour_id_canonical": "LTX0101-Tumour1",
+      "wgs_tumour_label": "LTX0101",
       "ploidy": 2.0,
       "n_clones": 1,
       "samples": [
@@ -89,6 +94,7 @@
       "patient_id": "LTX0102",
       "tumour_ordinal": 1,
       "tumour_id_canonical": "LTX0102-Tumour1",
+      "wgs_tumour_label": "LTX0102",
       "ploidy": 3.6,
       "n_clones": 1,
       "samples": [
@@ -105,6 +111,7 @@
       "patient_id": "LTX0103",
       "tumour_ordinal": 1,
       "tumour_id_canonical": "LTX0103-Tumour1",
+      "wgs_tumour_label": "LTX0103",
       "ploidy": 2.9,
       "n_clones": 2,
       "samples": [
@@ -128,6 +135,7 @@
       "patient_id": "LTX0104",
       "tumour_ordinal": 1,
       "tumour_id_canonical": "LTX0104-Tumour1",
+      "wgs_tumour_label": "LTX0104_tumour1",
       "ploidy": 2.3,
       "n_clones": 1,
       "samples": [
@@ -144,6 +152,7 @@
       "patient_id": "LTX0104",
       "tumour_ordinal": 2,
       "tumour_id_canonical": "LTX0104-Tumour2",
+      "wgs_tumour_label": "LTX0104_tumour2",
       "ploidy": 2.7,
       "n_clones": 2,
       "samples": [
@@ -160,6 +169,7 @@
       "patient_id": "LTX0105",
       "tumour_ordinal": 1,
       "tumour_id_canonical": "LTX0105-Tumour1",
+      "wgs_tumour_label": "LTX0105",
       "ploidy": 2.4,
       "n_clones": 1,
       "samples": [
@@ -176,6 +186,7 @@
       "patient_id": "LTX0106",
       "tumour_ordinal": 1,
       "tumour_id_canonical": "LTX0106-Tumour1",
+      "wgs_tumour_label": "LTX0106",
       "ploidy": 2.2,
       "n_clones": 1,
       "samples": [

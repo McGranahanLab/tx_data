@@ -122,6 +122,32 @@ def apply_convention_scalar(value: str) -> str:
     return _emit(patient, ordinal, target)
 
 
+# WGS tumour label: the Battenberg inventory's `PATIENT` column and the
+# Battenberg output folder names. It identifies a tumour, not a patient:
+# single-tumour patients carry the bare patient id (`LTX0001`), multi-tumour
+# patients get a `_tumour<n>` suffix (`LTX0002_tumour1`; `_tumour_2` also
+# accepted). Unlike WES, single tumours have no suffix at all.
+_WGS_TUMOUR_LABEL = re.compile(r"^((?:LTX|CRUK)\d+)(?:_tumour_?(\d+))?$", re.IGNORECASE)
+
+
+def parse_wgs_tumour_label(label: str) -> tuple[str, int]:
+    """Return ``(patient_id, tumour_ordinal)`` from a WGS tumour label.
+
+    A bare patient id means the patient's only tumour, ordinal 1.
+    Raises ``ValueError`` on anything else.
+    """
+    m = _WGS_TUMOUR_LABEL.match(label)
+    if m is None:
+        raise ValueError(f"Unrecognised WGS tumour label: {label!r}")
+    return m.group(1).upper(), int(m.group(2) or 1)
+
+
+def wgs_tumour_id(label: str) -> str:
+    """WGS tumour label → canonical tumour_id (``LTX0001`` → ``LTX0001-Tumour1``)."""
+    patient, ordinal = parse_wgs_tumour_label(label)
+    return apply_convention_scalar(f"{patient}_{ordinal}")
+
+
 def apply_convention_expr(col: str = "tumour_id") -> pl.Expr:
     """Polars expression: coerce a ``tumour_id`` column into the configured form."""
     return pl.col(col).map_elements(apply_convention_scalar, return_dtype=pl.String)

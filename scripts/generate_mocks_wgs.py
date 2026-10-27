@@ -13,6 +13,9 @@ Cohort shape (11 tumours / 12 samples / 10 patients), chosen to exercise:
   - one multi-region WGS tumour and one multi-tumour patient
   - one sample whose name breaks the usual `_SU_T<n>-R<n>` tokens (real
     WGS names have no closed catalogue)
+  - the source's tumour-label convention in `PATIENT` and the Battenberg
+    folder names: bare `LTX0001` for single-tumour patients,
+    `LTX0104_tumour1` / `LTX0104_tumour2` for multi-tumour patients
   - purity from very low (0.09) to high (0.88); near-diploid and
     WGD-like ploidy (~3.6-3.9)
 
@@ -61,16 +64,26 @@ class WgsTumour:
     n_clones: int
     samples: list[WgsSample]
 
+    # Set by cohort(): True when the patient has more than one WGS tumour.
+    multi_tumour_patient: bool = False
+
     @property
     def tumour_id_canonical(self) -> str:
         return f"{self.patient_id}-Tumour{self.tumour_ordinal}"
+
+    @property
+    def wgs_tumour_label(self) -> str:
+        """Source `PATIENT` value / Battenberg folder name for this tumour."""
+        if self.multi_tumour_patient:
+            return f"{self.patient_id}_tumour{self.tumour_ordinal}"
+        return self.patient_id
 
 
 def cohort() -> list[WgsTumour]:
     def one(region_purity: float) -> list[WgsSample]:
         return [WgsSample("R1", region_purity)]
 
-    return [
+    specs = [
         # Shared with the WES mock; mirrors the real head row (rho ~0.26, psi ~3.86).
         WgsTumour("LTX0001", 1, 3.86072434911302, 1, one(0.25893)),
         WgsTumour("LTX0002", 1, 1.98, 1, one(0.71)),
@@ -87,6 +100,12 @@ def cohort() -> list[WgsTumour]:
         WgsTumour("LTX0106", 1, 2.20, 1,                   # non-standard sample name
                   [WgsSample("R1", 0.47, name_token="LN1")]),
     ]
+    per_patient: dict[str, int] = {}
+    for t in specs:
+        per_patient[t.patient_id] = per_patient.get(t.patient_id, 0) + 1
+    for t in specs:
+        t.multi_tumour_patient = per_patient[t.patient_id] > 1
+    return specs
 
 
 def _hash() -> str:
@@ -113,15 +132,15 @@ def _write_inventory(specs: list[WgsTumour]) -> list[dict]:
             rho = round(s.purity + RNG.uniform(-0.01, 0.015), 2)
             solution = f"purpleDefault_psi{psi}_rho{rho}"
             rows.append({
-                "PATIENT": t.patient_id,
+                "PATIENT": t.wgs_tumour_label,
                 "TUMOUR_SAMPLE": name,
-                "results_dir": f"{BATTENBERG_OUT}/{t.patient_id}/results/",
+                "results_dir": f"{BATTENBERG_OUT}/{t.wgs_tumour_label}/results/",
                 "optimal_solution": solution,
                 "subclones": f"{name}_{solution}_subclones.txt.gz",
                 "purity": s.purity,
                 "ploidy": t.ploidy,
                 # Doubled slashes reproduce the real file's quirk.
-                "msai": f"{BATTENBERG_OUT}//{t.patient_id}/results//MSAI/multisample_MSAI.txt",
+                "msai": f"{BATTENBERG_OUT}//{t.wgs_tumour_label}/results//MSAI/multisample_MSAI.txt",
                 "mosdepth_summary": f"{MOSDEPTH_DIR}/{name}.mosdepth.summary.txt",
                 "coverage": round(RNG.uniform(60, 250), 2),
             })
@@ -149,6 +168,7 @@ def _write_manifest(specs: list[WgsTumour], rows: list[dict]) -> None:
                 "patient_id": t.patient_id,
                 "tumour_ordinal": t.tumour_ordinal,
                 "tumour_id_canonical": t.tumour_id_canonical,
+                "wgs_tumour_label": t.wgs_tumour_label,
                 "ploidy": t.ploidy,
                 "n_clones": t.n_clones,
                 "samples": [
