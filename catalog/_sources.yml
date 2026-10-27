@@ -60,9 +60,11 @@ alt_source_roots:
   # Clinical / QC release tree — sits outside the main tracerx_842 release
   # subtree. Used currently by id_crosswalk; may host more clinical assets.
   tx842_clinical_qc: /nemo/project/proj-tracerx-lung/tctProjects/lungTx/Tx842/clinical_qc/6_release/cohort
-  # WGS working tree (separate Nemo project, proj-tracerx-wgs). Holds the
-  # dated Battenberg output inventory.
-  txwgs_inventory: /nemo/project/proj-tracerx-wgs/working/liul/TxWGS/inventory
+  # Canonical WGS Battenberg output tree: one subdirectory per tumour,
+  # symlinked to the run directories. Relevant subdirectories: MSAI,
+  # optimal_solutions, results, tree_input (ignore intermediate, logs,
+  # plots). Inventory path columns already point here.
+  battenberg_wgs_output: /nemo/project/proj-tracerx-lung/tctProjects/CN-CCF/battenberg_wgs/output
 
 sources:
   muttable:
@@ -336,17 +338,16 @@ sources:
 
   wgs_battenberg_inventory:
     cohort: wgs
-    source_root: txwgs_inventory
-    relative_path: 2026-09-09_battenberg_output_inventory.tsv
+    relative_path: inventories/battenberg_output_inventory.tsv
     format: tsv
     header: true
     received: 2026-10-27
-    received_via: Piotr (Slack DM) supplied Nemo path + 1-row head
+    received_via: Piotr (Slack DM) supplied Nemo path + 1-row head; path corrected same day
     notes: |
-      One row per WGS tumour sample. Ten columns on source: PATIENT,
+      One row per WGS tumour sample (exactly one optimal solution each). Ten columns on source: PATIENT,
       TUMOUR_SAMPLE, results_dir, optimal_solution, subclones, purity,
       ploidy, msai, mosdepth_summary, coverage. Path columns are absolute
       `/nemo/...` paths pointing into other trees (battenberg_wgs output,
       mosdepth); some contain doubled slashes (`output//LTX0001/results//`).
-      `subclones` is a bare filename relative to `results_dir`. Dated
-      filename: a newer inventory means a new `relative_path` here.
+      `subclones` is a bare filename relative to `results_dir`. Lives in the
+      WGS cohort root (CN-CCF/wgs_resources), undated filename.

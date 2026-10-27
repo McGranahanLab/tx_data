@@ -6,16 +6,18 @@ Separate from ``generate_mocks.py`` (the WES mock). ``nemo_mock/`` mirrors
 mocks; later generators (Battenberg subclones, MSAI, mosdepth, ...) read it
 from ``nemo_mock/_cohort_manifest_wgs.json`` so all WGS mocks agree.
 
-Cohort shape (10 tumours / 11 samples / 9 patients), chosen to exercise:
+Cohort shape (11 tumours / 12 samples / 10 patients), chosen to exercise:
   - single-sample, single-clone tumours (the bulk of the real WGS cohort)
   - patients shared with the WES mock (LTX0001-LTX0004) with *different*
     sample hashes, plus WGS-only patients (LTX0101+)
   - one multi-region WGS tumour and one multi-tumour patient
+  - one sample whose name breaks the usual `_SU_T<n>-R<n>` tokens (real
+    WGS names have no closed catalogue)
   - purity from very low (0.09) to high (0.88); near-diploid and
     WGD-like ploidy (~3.6-3.9)
 
 Files written:
-  - ``project/proj-tracerx-wgs/working/liul/TxWGS/inventory/2026-09-09_battenberg_output_inventory.tsv``
+  - ``project/proj-tracerx-lung/tctProjects/CN-CCF/wgs_resources/inventories/battenberg_output_inventory.tsv``
   - ``_cohort_manifest_wgs.json`` (mock-only metadata, not part of the mirror)
 
 Deterministic (fixed seed) so mocks re-generate identically.
@@ -31,8 +33,8 @@ from tx_data.paths import REPO_ROOT
 
 MOCK_DIR = REPO_ROOT / "nemo_mock"
 INVENTORY = (
-    MOCK_DIR / "project" / "proj-tracerx-wgs" / "working" / "liul" / "TxWGS"
-    / "inventory" / "2026-09-09_battenberg_output_inventory.tsv"
+    MOCK_DIR / "project" / "proj-tracerx-lung" / "tctProjects" / "CN-CCF"
+    / "wgs_resources" / "inventories" / "battenberg_output_inventory.tsv"
 )
 
 # Real Nemo locations the inventory points at (kept as /nemo strings, as on source).
@@ -47,6 +49,8 @@ RNG = random.Random(SEED)
 class WgsSample:
     region: str
     purity: float
+    # Replaces the usual `T<n>-R<n>` token to mimic non-standard names.
+    name_token: str | None = None
 
 
 @dataclass
@@ -80,6 +84,8 @@ def cohort() -> list[WgsTumour]:
         WgsTumour("LTX0104", 1, 2.30, 1, one(0.50)),       # multi-tumour patient
         WgsTumour("LTX0104", 2, 2.70, 2, one(0.40)),
         WgsTumour("LTX0105", 1, 2.40, 1, one(0.09)),       # very low purity
+        WgsTumour("LTX0106", 1, 2.20, 1,                   # non-standard sample name
+                  [WgsSample("R1", 0.47, name_token="LN1")]),
     ]
 
 
@@ -88,7 +94,8 @@ def _hash() -> str:
 
 
 def _sample_name(t: WgsTumour, s: WgsSample, h: str) -> str:
-    return f"{t.patient_id}_SU_T{t.tumour_ordinal}-{s.region}--{h}"
+    token = s.name_token or f"T{t.tumour_ordinal}-{s.region}"
+    return f"{t.patient_id}_SU_{token}--{h}"
 
 
 def _write_inventory(specs: list[WgsTumour]) -> list[dict]:
@@ -128,11 +135,8 @@ def _write_inventory(specs: list[WgsTumour]) -> list[dict]:
 
 
 def _write_manifest(specs: list[WgsTumour], rows: list[dict]) -> None:
-    by_tumour: dict[tuple[str, int], list[dict]] = {}
-    for r in rows:
-        name = r["TUMOUR_SAMPLE"]
-        ordinal = int(name.split("_SU_T", 1)[1].split("-", 1)[0])
-        by_tumour.setdefault((r["PATIENT"], ordinal), []).append(r)
+    # Rows were emitted in spec order, one per sample.
+    it = iter(rows)
 
     manifest = {
         "schema_version": 1,
@@ -150,11 +154,12 @@ def _write_manifest(specs: list[WgsTumour], rows: list[dict]) -> None:
                 "samples": [
                     {
                         "sample_name_hash": r["TUMOUR_SAMPLE"],
-                        "region": r["TUMOUR_SAMPLE"].split("-", 1)[1].split("--", 1)[0],
+                        "region": s.region,
+                        "standard_name": s.name_token is None,
                         "purity": r["purity"],
                         "optimal_solution": r["optimal_solution"],
                     }
-                    for r in by_tumour[(t.patient_id, t.tumour_ordinal)]
+                    for s, r in ((s, next(it)) for s in t.samples)
                 ],
             }
             for t in specs

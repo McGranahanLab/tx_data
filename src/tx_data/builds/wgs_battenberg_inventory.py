@@ -5,10 +5,14 @@ Battenberg solution, purity, ploidy and pointers to the Battenberg results,
 the multi-sample MSAI file and the mosdepth summary.
 
 The WES `sample_hash_map` does not cover WGS samples, so `tumour_id` and
-`region` are parsed from the sample name itself. Any name that does not
-follow `<patient>_SU_T<n>-R<n>--<hash>` fails the build loudly rather than
-being dropped: an unparsed sample would silently vanish from every
-downstream WGS analysis.
+`region` are parsed best-effort from the sample name. Name tokens are
+unreliable with no closed catalogue, so a name that doesn't follow
+`<patient>_SU_T<n>-R<n>--<hash>` (or whose patient disagrees with
+`PATIENT`) keeps its row with NULL `tumour_id` / `region` and is logged.
+`patient_id` and `sample_name_hash` are always the source values.
+
+`optimal_solution` is kept verbatim; its psi / rho tokens are not parsed
+into columns because `purity` / `ploidy` are the values to use.
 
 Path columns stay as absolute `/nemo/...` strings (normalised); callers
 resolve them with `tx_data.paths.nemo_path()`.
@@ -43,12 +47,10 @@ SOURCE_RENAMES = {
 SAMPLE_RE = re.compile(
     r"^(?P<patient>(?:LTX|CRUK)\d+)_SU_T(?P<ordinal>\d+)-(?P<region>R\d+)--(?P<hash>.+)$"
 )
-SOLUTION_RE = re.compile(r"_psi(?P<psi>\d+(?:\.\d+)?)_rho(?P<rho>\d+(?:\.\d+)?)$")
 
 OUTPUT_COLUMNS = [
     "patient_id", "tumour_id", "region", "sample_name_hash",
-    "results_dir", "optimal_solution", "solution_psi", "solution_rho",
-    "subclones_file", "subclones_path",
+    "results_dir", "optimal_solution", "subclones_file", "subclones_path",
     "purity", "ploidy", "msai_path", "mosdepth_summary_path", "coverage",
 ]
 
@@ -70,15 +72,6 @@ def _parse_sample(name: str) -> tuple[str, str, str]:
     return patient, tumour_id, m.group("region")
 
 
-def _parse_solution(label: str | None) -> tuple[float | None, float | None]:
-    if label is None:
-        return None, None
-    m = SOLUTION_RE.search(label)
-    if m is None:
-        return None, None
-    return float(m.group("psi")), float(m.group("rho"))
-
-
 def build() -> pl.DataFrame:
     src = resolve_source(TABLE)
     log(f"read {src}")
@@ -98,37 +91,42 @@ def build() -> pl.DataFrame:
         )
     df = df.select(list(SOURCE_RENAMES)).rename(SOURCE_RENAMES)
 
-    # ---- identity: parse every sample name, fail on anything unexpected ----
-    parsed: dict[str, tuple[str, str, str]] = {}
-    bad: list[str] = []
-    for name in df.get_column("sample_name_hash").to_list():
+    # ---- identity: best-effort parse; unparsed samples keep NULL tumour_id ----
+    tumour_ids: dict[str, str | None] = {}
+    regions: dict[str, str | None] = {}
+    unparsed: list[str] = []
+    mismatched: list[str] = []
+    for patient, name in df.select("patient_id", "sample_name_hash").iter_rows():
         try:
-            parsed[name] = _parse_sample(name)
+            parsed_patient, tumour_id, region = _parse_sample(name)
         except ValueError:
-            bad.append(name)
-    if bad:
-        raise ValueError(
-            f"{TABLE}: {len(bad)} sample name(s) don't match "
-            f"<patient>_SU_T<n>-R<n>--<hash>; first: {bad[:5]}"
+            unparsed.append(name)
+            tumour_ids[name] = regions[name] = None
+            continue
+        if parsed_patient != patient:
+            mismatched.append(name)
+            tumour_ids[name] = regions[name] = None
+            continue
+        tumour_ids[name], regions[name] = tumour_id, region
+    if unparsed:
+        log(
+            f"{len(unparsed)} sample name(s) don't match <patient>_SU_T<n>-R<n>--<hash>; "
+            f"tumour_id/region left NULL. First: {unparsed[:5]}"
+        )
+    if mismatched:
+        log(
+            f"{len(mismatched)} sample name(s) disagree with PATIENT; "
+            f"tumour_id/region left NULL. First: {mismatched[:5]}"
         )
 
     df = df.with_columns(
         pl.col("sample_name_hash")
-        .replace_strict({k: v[0] for k, v in parsed.items()}, return_dtype=pl.String)
-        .alias("_parsed_patient"),
-        pl.col("sample_name_hash")
-        .replace_strict({k: v[1] for k, v in parsed.items()}, return_dtype=pl.String)
+        .replace_strict(tumour_ids, return_dtype=pl.String)
         .alias("tumour_id"),
         pl.col("sample_name_hash")
-        .replace_strict({k: v[2] for k, v in parsed.items()}, return_dtype=pl.String)
+        .replace_strict(regions, return_dtype=pl.String)
         .alias("region"),
     )
-    mismatch = df.filter(pl.col("patient_id") != pl.col("_parsed_patient"))
-    if mismatch.height:
-        raise ValueError(
-            f"{TABLE}: PATIENT disagrees with the sample name for {mismatch.height} row(s); "
-            f"first: {mismatch.select('patient_id', 'sample_name_hash').head(5).to_dicts()}"
-        )
 
     dupes = df.group_by("sample_name_hash").len().filter(pl.col("len") > 1)
     if dupes.height:
@@ -137,7 +135,7 @@ def build() -> pl.DataFrame:
             f"first: {dupes.head(5).to_dicts()}"
         )
 
-    # ---- paths + solution label ---------------------------------------------
+    # ---- paths ---------------------------------------------------------------
     path_cols = ["results_dir", "msai_path", "mosdepth_summary_path"]
     df = df.with_columns(
         [pl.col(c).map_elements(_norm_path, return_dtype=pl.String) for c in path_cols]
@@ -146,31 +144,16 @@ def build() -> pl.DataFrame:
         pl.when(pl.col("results_dir").is_not_null() & pl.col("subclones_file").is_not_null())
         .then(pl.col("results_dir") + "/" + pl.col("subclones_file"))
         .alias("subclones_path"),
-        pl.col("optimal_solution")
-        .map_elements(lambda s: _parse_solution(s)[0], return_dtype=pl.Float64)
-        .alias("solution_psi"),
-        pl.col("optimal_solution")
-        .map_elements(lambda s: _parse_solution(s)[1], return_dtype=pl.Float64)
-        .alias("solution_rho"),
         pl.col("purity").cast(pl.Float64),
         pl.col("ploidy").cast(pl.Float64),
         pl.col("coverage").cast(pl.Float64),
     )
 
-    unlabelled = df.filter(
-        pl.col("optimal_solution").is_not_null() & pl.col("solution_psi").is_null()
-    )
-    if unlabelled.height:
-        log(
-            f"{unlabelled.height} optimal_solution label(s) without _psi/_rho tokens; "
-            f"first: {unlabelled.get_column('optimal_solution').head(3).to_list()}"
-        )
-
     out_of_range = df.filter(~pl.col("purity").is_between(0.0, 1.0, closed="right"))
     if out_of_range.height:
         log(f"warning: {out_of_range.height} sample(s) with purity outside (0, 1]")
 
-    out_df = df.select(OUTPUT_COLUMNS).sort(["tumour_id", "region", "sample_name_hash"])
+    out_df = df.select(OUTPUT_COLUMNS).sort(["patient_id", "tumour_id", "region", "sample_name_hash"], nulls_last=True)
     out = canonical_output_path(TABLE)
     out_df.write_parquet(out)
     log(f"wrote {out} ({out_df.height} rows × {out_df.width} cols)")

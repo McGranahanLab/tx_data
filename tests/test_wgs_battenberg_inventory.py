@@ -43,8 +43,13 @@ def test_columns_and_key(table):
 
 def test_matches_manifest(table):
     m = json.loads(MANIFEST.read_text())
+    # Non-standard names keep the row but get NULL tumour_id / region.
     expected = {
-        s["sample_name_hash"]: (t["tumour_id_canonical"], s["region"], s["purity"])
+        s["sample_name_hash"]: (
+            t["tumour_id_canonical"] if s["standard_name"] else None,
+            s["region"] if s["standard_name"] else None,
+            s["purity"],
+        )
         for t in m["tumours"] for s in t["samples"]
     }
     got = {
@@ -65,11 +70,16 @@ def test_paths_normalised_and_resolvable(table):
     assert DEFAULT_MOCK_ROOT in p.parents
 
 
-def test_solution_label_parsed(table):
-    assert table["solution_psi"].null_count() == 0
-    assert ((table["solution_rho"] - table["purity"]).abs() < 0.03).all()
-    assert ((table["solution_psi"] - table["ploidy"]).abs() < 0.03).all()
-    assert (table["subclones_file"].str.contains(table["optimal_solution"])).all()
+def test_patient_always_present_and_nonstandard_names_kept(table):
+    assert table["patient_id"].null_count() == 0
+    assert "LTX0106" in table["patient_id"].to_list()
+    assert table.filter(pl.col("patient_id") == "LTX0106")["tumour_id"].null_count() == 1
+
+
+def test_no_rho_psi_columns(table):
+    # purity / ploidy are the values to use; label tokens are not surfaced.
+    assert not {"solution_psi", "solution_rho"} & set(table.columns)
+    assert table["subclones_file"].str.contains(table["optimal_solution"], literal=True).all()
 
 
 def test_wgs_hashes_disjoint_from_wes_hashes(table):
@@ -86,8 +96,3 @@ def test_parse_sample_rejects_unexpected_names():
         with pytest.raises(ValueError):
             inv._parse_sample(bad)
 
-
-def test_parse_solution():
-    assert inv._parse_solution("purpleDefault_psi3.85_rho0.27") == (3.85, 0.27)
-    assert inv._parse_solution("someRefit") == (None, None)
-    assert inv._parse_solution(None) == (None, None)
