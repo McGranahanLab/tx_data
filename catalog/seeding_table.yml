@@ -1,4 +1,5 @@
 name: seeding_table
+cohort: wes   # TRACERx WES (multi-region exome) cohort (see _sources.yml cohorts)
 description: |
   Per-tumour metastatic-seeding characterisation from the Tx842 primary+met
   release. One row per tumour, summarising whether the seeding event was

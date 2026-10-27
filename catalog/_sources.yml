@@ -4,20 +4,50 @@
 # read from here rather than hardcoding paths, so a build can be re-pointed
 # (e.g. from Tx842 to a future Tx900) by editing this one file.
 #
-# Path resolution:
-#   Effective source path = <TX_DATA_SOURCE_ROOT || config/paths.yml source_root> + relative_path
-#   For local development, the mocked equivalent lives in nemo_mock/<relative_path>.
+# Cohorts:
+#   The lab has two sequencing cohorts, WES (multi-region exome) and WGS
+#   (whole genome). Every entry under `sources:` MUST declare
+#   `cohort: <key from cohorts:>`, or `cohort: reference` for
+#   cohort-independent reference data (hg19 tables). Tables from different
+#   cohorts must never be mixed in a join by accident; the catalog YAML of
+#   each table carries the same `cohort:` field (tests enforce agreement).
+#
+# Path resolution (see `tx_data.paths` / `tx_data.sources`):
+#   Every root below is the absolute path on Nemo. At build time it is
+#   re-rooted under `nemo_root()`:
+#     prod    → nemo_root = /nemo           (paths used as-is)
+#     sandbox → nemo_root = <repo>/nemo_mock (nemo_mock/ mirrors /nemo 1:1)
+#   e.g. /nemo/project/.../tracerx_842/WGD/... →
+#        nemo_mock/project/.../tracerx_842/WGD/...
+#   Entry without `source_root:` → its cohort's `source_root_default`.
+#   Entry with `source_root: <alias>` → `alt_source_roots[<alias>]`.
+#   `source_root: in_repo` → tx_data repo root (static reference data).
 #
 # Filenames starting with `_` are treated as registry/metadata by catalog.load_all()
 # and are not loaded as table definitions.
 
-cohort:
-  id: Tx842
-  human_name: TRACERx 842
-  source_root_default: /nemo/project/proj-tracerx-lung/tctProjects/lungTx/Tx842/release/tracerx_842
-  # Optional per-table source_root overrides for assets that live outside the
-  # main release tree — resolves to `source_root: <root>` on the table entry.
+cohorts:
+  wes:
+    id: Tx842
+    human_name: TRACERx 842 (WES)
+    assay: WES
+    description: |
+      Multi-region whole-exome sequencing cohort. Every table currently in
+      tx_data belongs to this cohort (confirmed by Piotr, 2026-10-27).
+    source_root_default: /nemo/project/proj-tracerx-lung/tctProjects/lungTx/Tx842/release/tracerx_842
 
+  wgs:
+    id: TBC
+    human_name: TRACERx WGS (TBC)
+    assay: WGS
+    description: |
+      Whole-genome sequencing cohort. Mostly single-sample tumours. Files
+      live mainly under CN-CCF/wgs_resources (Piotr, 2026-10-27); assets
+      elsewhere get their own `alt_source_roots` alias. No tables yet.
+    source_root_default: /nemo/project/proj-tracerx-lung/tctProjects/CN-CCF/wgs_resources
+
+# Named roots for assets that live outside a cohort's main tree. A table
+# using one still declares its own `cohort:`; the alias is only a location.
 alt_source_roots:
   cn_ccf_alphamissense: /nemo/project/proj-tracerx-lung/tctProjects/CN-CCF/alphamissense
   # Mets RNA-seq release lives alongside the main Tx842 release tree; same
@@ -28,12 +58,9 @@ alt_source_roots:
   # subtree. Used currently by id_crosswalk; may host more clinical assets.
   tx842_clinical_qc: /nemo/project/proj-tracerx-lung/tctProjects/lungTx/Tx842/clinical_qc/6_release/cohort
 
-# Special `source_root: in_repo` resolves relative_path against the tx_data
-# repo root. For cohort-independent static reference data (hg19 UCSC tables
-# etc.) that we commit directly rather than hunting on each cluster.
-
 sources:
   muttable:
+    cohort: wes
     relative_path: tx842_mutation_table.tsv.gz
     format: tsv_gz
     header: true
@@ -43,6 +70,7 @@ sources:
       for "actually detected in this sample".
 
   wgd_calls:
+    cohort: wes
     relative_path: WGD/release_tx842/WGD_calls.tsv
     format: tsv
     header: true
@@ -54,6 +82,7 @@ sources:
       `LTX0001_tumour1`); loader normalises.
 
   alphamissense:
+    cohort: wes
     source_root: cn_ccf_alphamissense                  # from alt_source_roots
     relative_path_pattern: "output/annotated_muttables/tx842/{tumour_id}_muttable_alpha.tsv"
     format: tsv                                        # plain TSV, no `##` comment lines, clean header row
@@ -95,6 +124,7 @@ sources:
       is `alpha_missense`, renamed to `am_pathogenicity` at build time.
 
   clinical:
+    cohort: wes
     relative_path: tx842_clinical.tsv
     format: tsv
     header: true
@@ -108,6 +138,7 @@ sources:
       be derived.
 
   driver_list:
+    cohort: wes
     relative_path: drivers/tx842_driver_gene_list.tsv
     format: tsv
     header: true
@@ -119,6 +150,7 @@ sources:
       (GENCODE v49). Replaces the earlier plan to use COSMIC CGC directly.
 
   alpaca:
+    cohort: wes
     relative_path: ALPACA/output/cohort_results/all_tumours_combined.csv
     format: csv
     header: true
@@ -130,6 +162,7 @@ sources:
       Segment field is `<chr>_<start>_<end>` — parsed by the loader.
 
   clone_proportions:
+    cohort: wes
     relative_path_pattern: "ALPACA/input/{tumour_id}/cp_table.csv"
     format: csv
     header: true
@@ -145,6 +178,7 @@ sources:
       containing directory name.
 
   kallisto_counts:
+    cohort: wes
     source_root: tx842_mets_rnaseq
     relative_path: _aggregate/kallisto_mat/kallisto_counts.parquet
     format: parquet
@@ -156,6 +190,7 @@ sources:
       with `kallisto_tpm` by the builder.
 
   kallisto_tpm:
+    cohort: wes
     source_root: tx842_mets_rnaseq
     relative_path: _aggregate/kallisto_mat/kallisto_tpm.parquet
     format: parquet
@@ -165,6 +200,7 @@ sources:
       sample sets diverge between the two files.
 
   id_crosswalk:
+    cohort: wes
     source_root: tx842_clinical_qc
     relative_path: 2026-06-08_LTX_CRUK_key.csv
     format: csv
@@ -178,6 +214,7 @@ sources:
       CRUK-keyed sources (currently: clone_info).
 
   hg19_refgene__refgene:
+    cohort: reference
     source_root: in_repo
     relative_path: references/hg19/refGene.txt.gz
     format: tsv_gz
@@ -192,6 +229,7 @@ sources:
       builder.
 
   hg19_refgene__cytoband:
+    cohort: reference
     source_root: in_repo
     relative_path: references/hg19/cytoBand.txt.gz
     format: tsv_gz
@@ -203,6 +241,7 @@ sources:
       chrom, chromStart, chromEnd, band_name (e.g. `p36.33`), gie_stain.
 
   seeding_table:
+    cohort: wes
     relative_path: primary_met/tx842_primary_met_seedingTableFull.txt
     format: tsv
     header: true
@@ -217,6 +256,7 @@ sources:
       two `individual_*` columns split to `n_regions` tokens.
 
   clone_info:
+    cohort: wes
     relative_path: primary_met/tx842_primary_met_cloneInfo.df.txt
     format: tsv
     header: true
@@ -234,6 +274,7 @@ sources:
       and are kept for downstream analyses that want them.
 
   purity_ploidy:
+    cohort: wes
     relative_path: tx842_purity_ploidy.csv
     format: csv
     header: true
@@ -248,6 +289,7 @@ sources:
       derive canonical `tumour_id`.
 
   sample_hash_map:
+    cohort: wes
     relative_path: mapping_files/tx842_samplehash_tumour_lesion_map.tsv
     format: tsv
     header: true
@@ -263,6 +305,7 @@ sources:
       them via the `_N<n>` substring in the sample identifier.
 
   conipher_trees:
+    cohort: wes
     relative_path: tx842_trees.RDS                     # resolves against source_root_default
     format: rds                                        # R-native serialized object; loader uses R subprocess
     header: false

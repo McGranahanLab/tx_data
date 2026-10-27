@@ -4,7 +4,7 @@ One script per canonical table at `scripts/build_<table>.py`.
 
 ## Required behaviour
 
-1. Resolves source paths via `tx_data.paths.data_root()`. Never hardcodes `/Nemo`.
+1. Resolves source paths via `tx_data.sources.resolve_source(<table>)` (root + `cohort:` declared in `catalog/_sources.yml`). Never hardcodes `/nemo`.
 2. Reads source file(s).
 3. Cleans + renames + casts to the catalog schema.
 4. Writes canonical Parquet to `data/<table>.parquet`.
@@ -28,20 +28,20 @@ Re-running on unchanged inputs must produce byte-identical Parquet (modulo the t
 ## Skeleton
 
 ```python
-"""Build canonical <table>.parquet from source under data_root."""
+"""Build canonical <table>.parquet from its `_sources.yml` entry."""
 from __future__ import annotations
 
 import polars as pl
 
-from tx_data.paths import data_root, derived_dir
+from tx_data.sources import resolve_source
 
-SOURCE_REL = "path/under/data_root/<file>.csv"
+# `_sources.yml` entry for TABLE declares `cohort:` and `relative_path:`.
 TABLE = "<table>"
 PRIMARY_KEY = ["patient_id"]
 
 
 def build() -> pl.DataFrame:
-    src = data_root() / SOURCE_REL
+    src = resolve_source(TABLE)
     df = pl.read_csv(src)
     # rename, cast, clean
     return df.sort(PRIMARY_KEY)

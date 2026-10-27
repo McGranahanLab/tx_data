@@ -9,11 +9,15 @@ import yaml
 
 from tx_data.paths import (
     REPO_ROOT,
+    nemo_path,
     resolve_source_path,
     resolve_source_pattern,
 )
 
 SOURCES_YML = REPO_ROOT / "catalog" / "_sources.yml"
+
+# `cohort: reference` marks cohort-independent reference data (hg19 tables).
+REFERENCE_COHORT = "reference"
 
 
 @lru_cache(maxsize=1)
@@ -40,17 +44,24 @@ def resolve_source(name: str, **fmt: str) -> Path:
 
     entry = tables[name]
     alt_roots = doc.get("alt_source_roots", {})
+    cohort = source_cohort(name)
+    cohort_root = (
+        None if cohort == REFERENCE_COHORT
+        else doc["cohorts"][cohort]["source_root_default"]
+    )
 
     if "relative_path" in entry:
         return resolve_source_path(
             entry["relative_path"],
             source_root=entry.get("source_root"),
+            cohort_root=cohort_root,
             alt_source_roots=alt_roots,
         )
     if "relative_path_pattern" in entry:
         return resolve_source_pattern(
             entry["relative_path_pattern"],
             source_root=entry.get("source_root"),
+            cohort_root=cohort_root,
             alt_source_roots=alt_roots,
             **fmt,
         )
@@ -66,3 +77,24 @@ def source_entry(name: str) -> dict:
     if name not in tables:
         raise KeyError(f"Table {name!r} not in _sources.yml `sources:`")
     return tables[name]
+
+
+def source_cohort(name: str) -> str:
+    """Return the cohort key (`wes`, `wgs`, ...) or `reference` for a table."""
+    doc = load_sources()
+    entry = source_entry(name)
+    cohort = entry.get("cohort")
+    known = set(doc.get("cohorts", {})) | {REFERENCE_COHORT}
+    if cohort not in known:
+        raise ValueError(
+            f"Table {name!r} has cohort {cohort!r}; expected one of {sorted(known)}"
+        )
+    return cohort
+
+
+def cohort_root(cohort: str) -> Path:
+    """Resolve a cohort's main source tree under the current `nemo_root()`."""
+    cohorts = load_sources().get("cohorts", {})
+    if cohort not in cohorts:
+        raise KeyError(f"Cohort {cohort!r} not in _sources.yml `cohorts:`")
+    return nemo_path(cohorts[cohort]["source_root_default"])

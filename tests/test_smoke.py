@@ -15,21 +15,40 @@ def test_data_root_returns_path():
     assert isinstance(root, Path)
 
 
-def test_data_root_env_override(monkeypatch, tmp_path):
-    monkeypatch.setenv("TX_DATA_ROOT", str(tmp_path))
-    assert paths.data_root() == tmp_path
+def test_nemo_root_env_override(monkeypatch, tmp_path):
+    monkeypatch.setenv("TX_NEMO_ROOT", str(tmp_path))
+    assert paths.nemo_root() == tmp_path
+    assert paths.data_root() == tmp_path / (
+        "project/proj-tracerx-lung/tctProjects/lungTx/Tx842/release/tracerx_842"
+    )
 
 
-def test_data_root_default_is_nemo_mock(monkeypatch):
-    monkeypatch.delenv("TX_DATA_ROOT", raising=False)
-    root = paths.data_root()
-    assert root.name == "nemo_mock"
+def test_nemo_root_default_is_nemo_mock(monkeypatch):
+    monkeypatch.delenv("TX_NEMO_ROOT", raising=False)
+    assert paths.nemo_root() == paths.DEFAULT_MOCK_ROOT
+    assert paths.data_root_is_mock()
+
+
+def test_legacy_tx_data_root_fails_loudly(monkeypatch):
+    import pytest
+
+    monkeypatch.setenv("TX_DATA_ROOT", "/nemo/whatever")
+    with pytest.raises(RuntimeError, match="TX_NEMO_ROOT"):
+        paths.nemo_root()
+
+
+def test_nemo_path_rejects_non_nemo_paths():
+    import pytest
+
+    with pytest.raises(ValueError):
+        paths.nemo_path("/camp/elsewhere/file.tsv")
 
 
 def test_build_root_for_mode():
     assert paths.build_root_for_mode(None) is None
     assert paths.build_root_for_mode("sandbox") == paths.DEFAULT_MOCK_ROOT
     assert paths.build_root_for_mode("prod") == paths.DEFAULT_PROD_ROOT
+    assert paths.DEFAULT_PROD_ROOT == Path("/nemo")
 
 
 def test_catalog_dir_exists():

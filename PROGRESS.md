@@ -10,10 +10,20 @@ canonical store + synthetic `nemo_mock/` for local dev. Downstream projects
 
 ## Design (locked)
 
-- **Path resolution**: `tx_data.paths.data_root()` reads `TX_DATA_ROOT` env var
-  first, then falls back to `config/paths.yml`. Default `nemo_mock/`.
+- **Cohorts** (2026-10-27): two sequencing cohorts, `wes` (multi-region exome,
+  Tx842 release `lungTx/Tx842/release/tracerx_842`) and `wgs` (whole genome,
+  mostly `CN-CCF/wgs_resources`). `_sources.yml` `cohorts:` declares each root;
+  every source entry and every `catalog/<table>.yml` carries `cohort:`
+  (`wes` / `wgs` / `reference`). All tables so far are `wes`; hg19 tables are
+  `reference`. The build manifest records `table_cohorts`.
+- **Path resolution**: every root in `_sources.yml` is an absolute `/nemo/...`
+  path, re-rooted under `tx_data.paths.nemo_root()` (`TX_NEMO_ROOT` env var,
+  then `config/paths.yml` `nemo_root:`, default `nemo_mock/`). `nemo_mock/`
+  mirrors `/nemo` 1:1, so WES, WGS and alt roots all mock the same way.
+  `TX_DATA_ROOT` is retired and raises if set. `data_root()` still returns the
+  WES release root.
 - **Alt source roots**: `catalog/_sources.yml` `alt_source_roots:` map lets a
-  table declare `source_root: <alias>` to live outside the main release tree
+  table declare `source_root: <alias>` to live outside its cohort's main tree
   (used for AlphaMissense at `CN-CCF/alphamissense/…`).
 - **Canonical IDs**:
   - `tumour_id` canonical form: `LTX0001-Tumour1` (matches wgd_calls).
@@ -71,9 +81,9 @@ Legend: ✅ done · ⏳ in progress or todo.
 ```
 src/tx_data/
 ├── __init__.py
-├── paths.py          # data_root(), alt_root(alias)
+├── paths.py          # nemo_root(), nemo_path(), data_root() (WES)
 ├── catalog.py        # load_catalog(name) → dict; load_all() → dict[str,dict]
-├── sources.py        # load_sources() → dict; resolve_source(name)
+├── sources.py        # load_sources(); resolve_source(name); source_cohort(); cohort_root()
 ├── normalize.py      # canonical tumour_id / clone helpers
 └── builds/
     ├── __init__.py

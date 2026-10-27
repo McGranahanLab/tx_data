@@ -1,4 +1,5 @@
 name: clinical
+cohort: wes   # TRACERx WES (multi-region exome) cohort (see _sources.yml cohorts)
 description: |
   Per-patient clinical, demographic, exposure, and centrally-reviewed pathology
   table for the Tx842 cohort. One row per patient. Multi-tumour patients are

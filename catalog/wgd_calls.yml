@@ -1,4 +1,5 @@
 name: wgd_calls
+cohort: wes   # TRACERx WES (multi-region exome) cohort (see _sources.yml cohorts)
 description: |
   Per-clone whole-genome-doubling calls integrated across multiple internal
   tools including ParallelGDDetect (PGDD). One row per (tumour × clone).

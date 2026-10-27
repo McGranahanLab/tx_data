@@ -1,4 +1,5 @@
 name: alpaca
+cohort: wes   # TRACERx WES (multi-region exome) cohort (see _sources.yml cohorts)
 description: |
   ALPACA per-clone allele-specific integer copy number for every ASCAT segment
   in every tumour. One row per (tumour × segment × clone).

@@ -5,6 +5,7 @@ One YAML file per canonical table. Files starting with `_` are templates/example
 ## Fields per table
 
 - `name` — canonical table name (snake_case)
+- `cohort` — `wes`, `wgs` (keys of `_sources.yml` `cohorts:`) or `reference` for cohort-independent reference data. Must match the table's `_sources.yml` entry; never join tables from different cohorts without saying so explicitly.
 - `description` — plain-English summary
 - `provenance` — source path(s) + version + notes on how it was produced
 - `primary_key` — column(s) uniquely identifying a row

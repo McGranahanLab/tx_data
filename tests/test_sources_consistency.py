@@ -28,13 +28,13 @@ SOURCE_TO_CATALOG = {
 }
 
 
-def _resolve(entry: dict, cohort_root: str, alt_roots: dict[str, str]) -> str | None:
+def _resolve(entry: dict, cohorts: dict, alt_roots: dict[str, str]) -> str | None:
     rel = entry.get("relative_path")
     if rel is None:
         return None
     root_alias = entry.get("source_root")
     if root_alias is None:
-        root = cohort_root
+        root = cohorts[entry["cohort"]]["source_root_default"]
     elif root_alias == "in_repo":
         # Static reference data committed directly in tx_data; catalog
         # documents the upstream origin (URLs) rather than a mirrored path,
@@ -51,14 +51,14 @@ def _resolve(entry: dict, cohort_root: str, alt_roots: dict[str, str]) -> str | 
 
 def test_sources_vs_catalog_paths_agree():
     sources_doc = yaml.safe_load(SOURCES_YML.read_text())
-    cohort_root = sources_doc["cohort"]["source_root_default"]
+    cohorts = sources_doc["cohorts"]
     alt_roots = sources_doc.get("alt_source_roots", {}) or {}
     sources = sources_doc.get("sources", {}) or {}
 
     mismatches: list[str] = []
 
     for src_name, entry in sources.items():
-        expected = _resolve(entry, cohort_root, alt_roots)
+        expected = _resolve(entry, cohorts, alt_roots)
         if expected is None:
             # Per-tumour pattern or no relative_path — skip.
             continue
@@ -89,3 +89,65 @@ def test_sources_vs_catalog_paths_agree():
             )
 
     assert not mismatches, "Catalog ↔ _sources.yml drift:\n\n" + "\n\n".join(mismatches)
+
+
+def test_every_source_declares_a_known_cohort():
+    sources_doc = yaml.safe_load(SOURCES_YML.read_text())
+    known = set(sources_doc["cohorts"]) | {"reference"}
+    bad = {
+        name: entry.get("cohort")
+        for name, entry in sources_doc["sources"].items()
+        if entry.get("cohort") not in known
+    }
+    assert not bad, f"sources with missing/unknown cohort: {bad}"
+
+
+def test_catalog_cohort_matches_sources():
+    sources_doc = yaml.safe_load(SOURCES_YML.read_text())
+    mismatches = []
+    for src_name, entry in sources_doc["sources"].items():
+        catalog_name = SOURCE_TO_CATALOG.get(src_name, src_name)
+        catalog_doc = yaml.safe_load((CATALOG_DIR / f"{catalog_name}.yml").read_text())
+        if catalog_doc.get("cohort") != entry.get("cohort"):
+            mismatches.append(
+                f"{src_name}: _sources.yml cohort={entry.get('cohort')!r}, "
+                f"catalog/{catalog_name}.yml cohort={catalog_doc.get('cohort')!r}"
+            )
+    assert not mismatches, "\n".join(mismatches)
+
+
+def test_every_catalog_declares_cohort():
+    sources_doc = yaml.safe_load(SOURCES_YML.read_text())
+    known = set(sources_doc["cohorts"]) | {"reference"}
+    missing = [
+        p.name for p in sorted(CATALOG_DIR.glob("*.yml"))
+        if not p.name.startswith("_")
+        and yaml.safe_load(p.read_text()).get("cohort") not in known
+    ]
+    assert not missing, f"catalog files without a valid cohort: {missing}"
+
+
+def test_wes_root_constant_matches_registry():
+    from tx_data.paths import WES_RELEASE_ROOT
+
+    sources_doc = yaml.safe_load(SOURCES_YML.read_text())
+    assert str(WES_RELEASE_ROOT) == sources_doc["cohorts"]["wes"]["source_root_default"]
+
+
+def test_every_nemo_source_exists_in_mock(monkeypatch):
+    """nemo_mock/ mirrors /nemo: each non-pattern source must exist in it."""
+    from tx_data.paths import DEFAULT_MOCK_ROOT
+    from tx_data.sources import resolve_source
+
+    monkeypatch.delenv("TX_NEMO_ROOT", raising=False)
+    sources_doc = yaml.safe_load(SOURCES_YML.read_text())
+    missing = []
+    for name, entry in sources_doc["sources"].items():
+        if "relative_path" not in entry:
+            continue
+        p = resolve_source(name)
+        if entry.get("source_root") != "in_repo":
+            assert DEFAULT_MOCK_ROOT in p.parents, (name, p)
+        if not p.exists():
+            missing.append(f"{name}: {p}")
+    assert not missing, "missing from nemo_mock:\n" + "\n".join(missing)
