@@ -1,0 +1,131 @@
+name: wgs_consensus_segments
+cohort: wgs   # TRACERx WGS cohort (see _sources.yml cohorts)
+description: |
+  Fractional (non-integer) allele-specific copy number for every WGS tumour
+  sample on the tumour's consensus segments, from the Battenberg
+  `tree_input/` folder. One row per (sample × consensus segment).
+
+  This is the sample-level fractional CN source for the
+  deviation-from-nearest-integer analysis (Piotr, 2026-10-27). For
+  integer, clone-specific CN use ALPACA instead.
+
+provenance:
+  cohort: TRACERx WGS
+  hpc_source: /nemo/project/proj-tracerx-lung/tctProjects/CN-CCF/battenberg_wgs/output/<wgs_tumour_label>/tree_input/<wgs_tumour_label>_copynumber_consensus_segments_tree_input.tsv
+  format_on_source: TSV, header row, one file per tumour
+  received: 2026-10-27
+  received_via: Piotr (Slack DM) supplied tree_input listing + 3-row head
+  canonical_format: Parquet (after build script)
+  pipeline: Battenberg on WGS → MSAI pipeline tree_input (consensus segmentation across a tumour's samples)
+
+primary_key:
+  - tumour_id
+  - sample
+  - chr
+  - start
+
+grain: one row per (WGS tumour sample × consensus segment)
+
+genome_build: hg38
+chr_prefix: false
+
+source_columns:
+  SAMPLE: sample
+  CHR: chr
+  STARTPOS: start
+  ENDPOS: end
+  COPY_NUMBER_MAJOR: cn_major   # legacy files: COPY_NUMBER_A
+  COPY_NUMBER_MINOR: cn_minor   # legacy files: COPY_NUMBER_B
+
+joins:
+  wgs_battenberg_inventory:
+    on:
+      - "wgs_consensus_segments.sample_name_hash = wgs_battenberg_inventory.sample_name_hash"
+    notes: "Brings purity, ploidy and coverage per sample."
+  wgs_clone_proportions:
+    on:
+      - "wgs_consensus_segments.tumour_id = wgs_clone_proportions.tumour_id"
+    notes: "Clone composition per sample; e.g. to select single-clone tumours."
+
+columns:
+  - name: tumour_id
+    type: VARCHAR
+    description: "Canonical tumour ID (`LTX0001-Tumour1`), from the folder's WGS tumour label via the inventory."
+    null_semantics: not_applicable
+    derived: true
+
+  - name: patient_id
+    type: VARCHAR
+    description: "Patient ID (`LTX0001`)."
+    null_semantics: not_applicable
+    derived: true
+
+  - name: wgs_tumour_label
+    type: VARCHAR
+    description: "WGS tumour label = Battenberg folder name (`LTX0001`, `LTX0002_tumour1`). For locating files only."
+    null_semantics: not_applicable
+    derived: true
+
+  - name: sample_name_hash
+    type: VARCHAR
+    description: |
+      Inventory sample name (`LTX0001_SU_T1-R1--38da873ff7`) matched from
+      `sample` within the tumour (`tx_data.wgs_samples.match_sample`:
+      full name, stem before `--`, or stem with `-` → `.`).
+    null_semantics: unknown
+    derived: true
+    notes: "NULL (and logged by the build) when `sample` has no inventory match."
+
+  - name: sample
+    type: VARCHAR
+    description: "Source `SAMPLE` verbatim, a short form of the sample name (`LTX0001_SU_T1.R1`)."
+    null_semantics: not_applicable
+
+  - name: chr
+    type: VARCHAR
+    description: "Chromosome, no `chr` prefix (`1`..`22`, `X`)."
+    null_semantics: not_applicable
+
+  - name: start
+    type: BIGINT
+    description: "Segment start (source STARTPOS), hg38."
+    null_semantics: not_applicable
+
+  - name: end
+    type: BIGINT
+    description: "Segment end (source ENDPOS), hg38."
+    null_semantics: not_applicable
+
+  - name: cn_major
+    type: DOUBLE
+    description: "Fractional major-allele copy number in this sample (source COPY_NUMBER_MAJOR, or COPY_NUMBER_A in older files). Kept exactly as on source."
+    null_semantics: unknown
+
+  - name: cn_minor
+    type: DOUBLE
+    description: "Fractional minor-allele copy number in this sample (source COPY_NUMBER_MINOR, or COPY_NUMBER_B in older files). Kept exactly as on source."
+    null_semantics: unknown
+
+  - name: cn_total
+    type: DOUBLE
+    description: "cn_major + cn_minor."
+    null_semantics: unknown
+    derived: true
+
+relationships:
+  - column: sample_name_hash
+    references: wgs_battenberg_inventory.sample_name_hash
+  - column: tumour_id
+    references: wgs_battenberg_inventory.tumour_id
+
+scope_notes: |
+  Values are not rounded, clipped, or reordered. The build logs (but keeps)
+  rows with cn_major < cn_minor. Tumours in the inventory without a file
+  are logged and absent. Other `tree_input/` files (MSAI-adjusted segments,
+  lost coverage, mutations, segmentation report) are not imported yet.
+
+open_questions:
+  - "Coordinates: 1-based inclusive (Battenberg convention)? Do consensus segments tile the genome, or are gaps meaningful?"
+  - "Legacy COPY_NUMBER_A/_B: are those really major/minor (A ≥ B everywhere), or allele A/B that can be swapped relative to major/minor?"
+  - "Is chrX included for all patients, and is sex needed to interpret it?"
+  - "Should the analysis use these segments or the MSAI-adjusted ones (`..._MSAI_adjusted_consensus_segments_tree_input.tsv`) for the deviation measure?"

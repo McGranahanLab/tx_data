@@ -351,3 +351,44 @@ sources:
       mosdepth); some contain doubled slashes (`output//LTX0001/results//`).
       `subclones` is a bare filename relative to `results_dir`. Lives in the
       WGS cohort root (CN-CCF/wgs_resources), undated filename.
+
+  wgs_consensus_segments:
+    cohort: wgs
+    source_root: battenberg_wgs_output
+    relative_path_pattern: "{wgs_tumour_label}/tree_input/{wgs_tumour_label}_copynumber_consensus_segments_tree_input.tsv"
+    format: tsv
+    header: true
+    per_tumour: true
+    per_tumour_discovery: wgs_battenberg_inventory   # one file per distinct wgs_tumour_label
+    tumour_id_form: "wgs_tumour_label (LTX0001 / LTX0002_tumour1)"
+    received: 2026-10-27
+    received_via: Piotr (Slack DM) supplied tree_input listing + 3-row head
+    notes: |
+      Fractional allele-specific CN per sample on consensus segments
+      (from tree_input/). Piotr's chosen source for the deviation-from-
+      integer analysis (2026-10-27). One row per (sample × consensus
+      segment). Columns: SAMPLE, CHR, STARTPOS, ENDPOS, COPY_NUMBER_MAJOR,
+      COPY_NUMBER_MINOR. Older files use COPY_NUMBER_A / COPY_NUMBER_B
+      for the same two columns. SAMPLE is a short form of the inventory
+      sample name (`LTX0001_SU_T1.R1` vs `LTX0001_SU_T1-R1--<hash>`).
+      Sibling files in tree_input/ (mutations, MSAI-adjusted segments,
+      lost coverage, segmentation report) are not imported yet.
+
+  wgs_clone_proportions:
+    cohort: wgs
+    relative_path_pattern: "alpaca/input/{wgs_tumour_label}/cp_table.csv"
+    format: csv
+    header: true
+    per_tumour: true
+    per_tumour_discovery: wgs_battenberg_inventory
+    tumour_id_form: "wgs_tumour_label (LTX0001 / LTX0002_tumour1)"
+    received: 2026-10-27
+    received_via: Piotr (Slack DM) supplied directory listing; format "same as WES"
+    notes: |
+      ALPACA input clone composition table, same wide layout as the WES
+      `clone_proportions` source (N sample columns + trailing `clone`
+      column, proportions in [0, 1]). Other files in alpaca/input/<label>/
+      (ALPACA_input_table.csv, ci_table.csv, phased_segs.tsv,
+      precomputed_ci.tsv, tree_paths.json, segments/, reports) are not
+      imported yet. ALPACA output lives in alpaca/output (structure TBC).
+

@@ -4,6 +4,7 @@
   "cohort_tag": "TxWGS_mock",
   "genome_build": "hg38",
   "random_seed": 20261027,
+  "cn_noise_sd_at_purity_1": 0.03,
   "tumours": [
     {
       "patient_id": "LTX0001",
@@ -12,6 +13,16 @@
       "wgs_tumour_label": "LTX0001",
       "ploidy": 3.86072434911302,
       "n_clones": 1,
+      "n_segments": 97,
+      "segments_header": "major_minor",
+      "segments_sample_names": [
+        "LTX0001_SU_T1.R1"
+      ],
+      "clone_proportions": {
+        "LTX0001_SU_T1-R1--41466d3700": {
+          "clone1": 1.0
+        }
+      },
       "samples": [
         {
           "sample_name_hash": "LTX0001_SU_T1-R1--41466d3700",
@@ -29,6 +40,16 @@
       "wgs_tumour_label": "LTX0002",
       "ploidy": 1.98,
       "n_clones": 1,
+      "n_segments": 92,
+      "segments_header": "major_minor",
+      "segments_sample_names": [
+        "LTX0002_SU_T1.R1"
+      ],
+      "clone_proportions": {
+        "LTX0002_SU_T1-R1--2d7f68c56f": {
+          "clone1": 1.0
+        }
+      },
       "samples": [
         {
           "sample_name_hash": "LTX0002_SU_T1-R1--2d7f68c56f",
@@ -46,6 +67,16 @@
       "wgs_tumour_label": "LTX0003",
       "ploidy": 2.1,
       "n_clones": 1,
+      "n_segments": 104,
+      "segments_header": "major_minor",
+      "segments_sample_names": [
+        "LTX0003_SU_T1.R1"
+      ],
+      "clone_proportions": {
+        "LTX0003_SU_T1-R1--a203689682": {
+          "clone1": 1.0
+        }
+      },
       "samples": [
         {
           "sample_name_hash": "LTX0003_SU_T1-R1--a203689682",
@@ -63,6 +94,18 @@
       "wgs_tumour_label": "LTX0004",
       "ploidy": 3.2,
       "n_clones": 3,
+      "n_segments": 88,
+      "segments_header": "major_minor",
+      "segments_sample_names": [
+        "LTX0004_SU_T1.R1"
+      ],
+      "clone_proportions": {
+        "LTX0004_SU_T1-R1--b3ccabd941": {
+          "clone1": 0.5598,
+          "clone2": 0.1449,
+          "clone3": 0.2953
+        }
+      },
       "samples": [
         {
           "sample_name_hash": "LTX0004_SU_T1-R1--b3ccabd941",
@@ -80,6 +123,16 @@
       "wgs_tumour_label": "LTX0101",
       "ploidy": 2.0,
       "n_clones": 1,
+      "n_segments": 95,
+      "segments_header": "major_minor",
+      "segments_sample_names": [
+        "LTX0101_SU_T1.R1"
+      ],
+      "clone_proportions": {
+        "LTX0101_SU_T1-R1--a961170f44": {
+          "clone1": 1.0
+        }
+      },
       "samples": [
         {
           "sample_name_hash": "LTX0101_SU_T1-R1--a961170f44",
@@ -97,6 +150,16 @@
       "wgs_tumour_label": "LTX0102",
       "ploidy": 3.6,
       "n_clones": 1,
+      "n_segments": 99,
+      "segments_header": "legacy_A_B",
+      "segments_sample_names": [
+        "LTX0102_SU_T1.R1"
+      ],
+      "clone_proportions": {
+        "LTX0102_SU_T1-R1--87e2aaccca": {
+          "clone1": 1.0
+        }
+      },
       "samples": [
         {
           "sample_name_hash": "LTX0102_SU_T1-R1--87e2aaccca",
@@ -114,6 +177,22 @@
       "wgs_tumour_label": "LTX0103",
       "ploidy": 2.9,
       "n_clones": 2,
+      "n_segments": 83,
+      "segments_header": "major_minor",
+      "segments_sample_names": [
+        "LTX0103_SU_T1.R1",
+        "LTX0103_SU_T1.R2"
+      ],
+      "clone_proportions": {
+        "LTX0103_SU_T1-R1--0237ebf159": {
+          "clone1": 0.2671,
+          "clone2": 0.7329
+        },
+        "LTX0103_SU_T1-R2--2776e94cb6": {
+          "clone1": 0.4228,
+          "clone2": 0.5772
+        }
+      },
       "samples": [
         {
           "sample_name_hash": "LTX0103_SU_T1-R1--0237ebf159",
@@ -138,6 +217,16 @@
       "wgs_tumour_label": "LTX0104_tumour1",
       "ploidy": 2.3,
       "n_clones": 1,
+      "n_segments": 82,
+      "segments_header": "major_minor",
+      "segments_sample_names": [
+        "LTX0104_SU_T1.R1"
+      ],
+      "clone_proportions": {
+        "LTX0104_SU_T1-R1--84ad5706ab": {
+          "clone1": 1.0
+        }
+      },
       "samples": [
         {
           "sample_name_hash": "LTX0104_SU_T1-R1--84ad5706ab",
@@ -155,6 +244,17 @@
       "wgs_tumour_label": "LTX0104_tumour2",
       "ploidy": 2.7,
       "n_clones": 2,
+      "n_segments": 93,
+      "segments_header": "major_minor",
+      "segments_sample_names": [
+        "LTX0104_SU_T2.R1"
+      ],
+      "clone_proportions": {
+        "LTX0104_SU_T2-R1--043bc30a48": {
+          "clone1": 0.6428,
+          "clone2": 0.3572
+        }
+      },
       "samples": [
         {
           "sample_name_hash": "LTX0104_SU_T2-R1--043bc30a48",
@@ -172,6 +272,16 @@
       "wgs_tumour_label": "LTX0105",
       "ploidy": 2.4,
       "n_clones": 1,
+      "n_segments": 92,
+      "segments_header": "major_minor",
+      "segments_sample_names": [
+        "LTX0105_SU_T1.R1"
+      ],
+      "clone_proportions": {
+        "LTX0105_SU_T1-R1--b1895f54c4": {
+          "clone1": 1.0
+        }
+      },
       "samples": [
         {
           "sample_name_hash": "LTX0105_SU_T1-R1--b1895f54c4",
@@ -189,6 +299,16 @@
       "wgs_tumour_label": "LTX0106",
       "ploidy": 2.2,
       "n_clones": 1,
+      "n_segments": 99,
+      "segments_header": "major_minor",
+      "segments_sample_names": [
+        "LTX0106_SU_LN1"
+      ],
+      "clone_proportions": {
+        "LTX0106_SU_LN1--2ce9303a53": {
+          "clone1": 1.0
+        }
+      },
       "samples": [
         {
           "sample_name_hash": "LTX0106_SU_LN1--2ce9303a53",

@@ -1,0 +1,93 @@
+name: wgs_clone_proportions
+cohort: wgs   # TRACERx WGS cohort (see _sources.yml cohorts)
+description: |
+  ALPACA input clone composition for WGS tumours: the proportion of each
+  clone in each sample. Long form, one row per (tumour × clone × sample).
+  WGS counterpart of `clone_proportions` (same source layout).
+
+  Used to tell single-clone tumours from multi-clone ones.
+
+provenance:
+  cohort: TRACERx WGS
+  hpc_source: /nemo/project/proj-tracerx-lung/tctProjects/CN-CCF/wgs_resources/alpaca/input/<wgs_tumour_label>/cp_table.csv
+  format_on_source: CSV, header row; N sample columns + trailing `clone` column; one file per tumour
+  received: 2026-10-27
+  received_via: Piotr (Slack DM) supplied directory listing; format stated as same as WES
+  canonical_format: Parquet (after build script)
+  pipeline: ALPACA input preparation (CONIPHER clone composition)
+
+primary_key:
+  - tumour_id
+  - clone
+  - sample_id
+
+grain: one row per (WGS tumour × clone × sample column)
+
+joins:
+  wgs_battenberg_inventory:
+    on:
+      - "wgs_clone_proportions.sample_name_hash = wgs_battenberg_inventory.sample_name_hash"
+  wgs_consensus_segments:
+    on:
+      - "wgs_clone_proportions.tumour_id = wgs_consensus_segments.tumour_id"
+
+filters_of_interest:
+  clones_per_tumour: "SELECT tumour_id, count(DISTINCT clone) FROM wgs_clone_proportions GROUP BY tumour_id"
+  clones_present_per_tumour: "SELECT tumour_id, count(DISTINCT clone) FROM wgs_clone_proportions WHERE proportion > 0 GROUP BY tumour_id"
+
+columns:
+  - name: tumour_id
+    type: VARCHAR
+    description: "Canonical tumour ID (`LTX0001-Tumour1`), standardised from the folder's WGS tumour label."
+    null_semantics: not_applicable
+    derived: true
+
+  - name: patient_id
+    type: VARCHAR
+    description: "Patient ID (`LTX0001`)."
+    null_semantics: not_applicable
+    derived: true
+
+  - name: wgs_tumour_label
+    type: VARCHAR
+    description: "Folder name under alpaca/input (`LTX0001`, `LTX0002_tumour1`). For locating files only."
+    null_semantics: not_applicable
+    derived: true
+
+  - name: clone
+    type: VARCHAR
+    description: "Clone ID (`clone1`, ...) verbatim from the trailing `clone` column."
+    null_semantics: not_applicable
+
+  - name: sample_id
+    type: VARCHAR
+    description: "Source sample column header verbatim."
+    null_semantics: not_applicable
+
+  - name: sample_name_hash
+    type: VARCHAR
+    description: "Inventory sample name matched from `sample_id` within the tumour (full name, stem, or stem with `-` → `.`)."
+    null_semantics: unknown
+    derived: true
+    notes: "NULL (and logged) when the header has no inventory match."
+
+  - name: proportion
+    type: DOUBLE
+    description: "Proportion of this clone in this sample, in [0, 1]."
+    null_semantics: not_measured
+
+relationships:
+  - column: sample_name_hash
+    references: wgs_battenberg_inventory.sample_name_hash
+  - column: tumour_id
+    references: wgs_battenberg_inventory.tumour_id
+
+scope_notes: |
+  Rows kept as on source; the build doesn't decide what counts as "single
+  clone" (e.g. whether a clone at proportion 0 in every sample counts).
+  Other alpaca/input files are not imported yet; ALPACA output (integer
+  clone-specific CN) is a separate, later table.
+
+open_questions:
+  - "Are WGS cp_table sample headers full sample names like WES, or the short tree_input form? (Both are matched.)"
+  - "For single-clone calls: count clones in cp_table, or clones on the CONIPHER tree (tree_paths.json)? Can a cp_table list a clone at proportion 0?"

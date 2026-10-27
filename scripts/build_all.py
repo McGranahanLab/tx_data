@@ -40,7 +40,10 @@ TABLES = (
     "conipher_trees",
     "purity_ploidy",
     # ---- WGS cohort ----
+    # Inventory first: the other WGS builds discover tumours and samples from it.
     "wgs_battenberg_inventory",
+    "wgs_consensus_segments",
+    "wgs_clone_proportions",
 )
 
 
