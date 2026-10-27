@@ -31,6 +31,7 @@ cohorts:
     id: Tx842
     human_name: TRACERx 842 (WES)
     assay: WES
+    genome_build: hg19   # moving to hg38 soon (Piotr, 2026-10-27)
     description: |
       Multi-region whole-exome sequencing cohort. Every table currently in
       tx_data belongs to this cohort (confirmed by Piotr, 2026-10-27).
@@ -40,10 +41,12 @@ cohorts:
     id: TBC
     human_name: TRACERx WGS (TBC)
     assay: WGS
+    genome_build: hg38
     description: |
       Whole-genome sequencing cohort. Mostly single-sample tumours. Files
       live mainly under CN-CCF/wgs_resources (Piotr, 2026-10-27); assets
-      elsewhere get their own `alt_source_roots` alias. No tables yet.
+      elsewhere get their own `alt_source_roots` alias. WGS tables are
+      named `wgs_<table>` so they never collide with a WES table name.
     source_root_default: /nemo/project/proj-tracerx-lung/tctProjects/CN-CCF/wgs_resources
 
 # Named roots for assets that live outside a cohort's main tree. A table
@@ -57,6 +60,9 @@ alt_source_roots:
   # Clinical / QC release tree — sits outside the main tracerx_842 release
   # subtree. Used currently by id_crosswalk; may host more clinical assets.
   tx842_clinical_qc: /nemo/project/proj-tracerx-lung/tctProjects/lungTx/Tx842/clinical_qc/6_release/cohort
+  # WGS working tree (separate Nemo project, proj-tracerx-wgs). Holds the
+  # dated Battenberg output inventory.
+  txwgs_inventory: /nemo/project/proj-tracerx-wgs/working/liul/TxWGS/inventory
 
 sources:
   muttable:
@@ -328,3 +334,19 @@ sources:
         the per-tumour `<tumour_id>_trees.rds` files the paper's R script
         expects.
 
+  wgs_battenberg_inventory:
+    cohort: wgs
+    source_root: txwgs_inventory
+    relative_path: 2026-09-09_battenberg_output_inventory.tsv
+    format: tsv
+    header: true
+    received: 2026-10-27
+    received_via: Piotr (Slack DM) supplied Nemo path + 1-row head
+    notes: |
+      One row per WGS tumour sample. Ten columns on source: PATIENT,
+      TUMOUR_SAMPLE, results_dir, optimal_solution, subclones, purity,
+      ploidy, msai, mosdepth_summary, coverage. Path columns are absolute
+      `/nemo/...` paths pointing into other trees (battenberg_wgs output,
+      mosdepth); some contain doubled slashes (`output//LTX0001/results//`).
+      `subclones` is a bare filename relative to `results_dir`. Dated
+      filename: a newer inventory means a new `relative_path` here.

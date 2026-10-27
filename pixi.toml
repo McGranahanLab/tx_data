@@ -18,7 +18,7 @@ tx_data = { path = ".", editable = true }
 pyliftover = ">=0.4"
 
 [tasks]
-mocks    = "python scripts/generate_mocks.py"
+mocks    = "python scripts/generate_mocks.py && python scripts/generate_mocks_wgs.py"
 build    = "python scripts/build_all.py"
 test     = "pytest tests/ -q"
 liftover = "python scripts/liftover_muttable.py"

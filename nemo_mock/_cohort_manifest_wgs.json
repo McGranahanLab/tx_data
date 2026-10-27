@@ -1,0 +1,165 @@
+{
+  "schema_version": 1,
+  "cohort": "wgs",
+  "cohort_tag": "TxWGS_mock",
+  "genome_build": "hg38",
+  "random_seed": 20261027,
+  "tumours": [
+    {
+      "patient_id": "LTX0001",
+      "tumour_ordinal": 1,
+      "tumour_id_canonical": "LTX0001-Tumour1",
+      "ploidy": 3.86072434911302,
+      "n_clones": 1,
+      "samples": [
+        {
+          "sample_name_hash": "LTX0001_SU_T1-R1--41466d3700",
+          "region": "R1",
+          "purity": 0.25893,
+          "optimal_solution": "purpleDefault_psi3.86_rho0.26"
+        }
+      ]
+    },
+    {
+      "patient_id": "LTX0002",
+      "tumour_ordinal": 1,
+      "tumour_id_canonical": "LTX0002-Tumour1",
+      "ploidy": 1.98,
+      "n_clones": 1,
+      "samples": [
+        {
+          "sample_name_hash": "LTX0002_SU_T1-R1--2d7f68c56f",
+          "region": "R1",
+          "purity": 0.71,
+          "optimal_solution": "purpleDefault_psi1.99_rho0.71"
+        }
+      ]
+    },
+    {
+      "patient_id": "LTX0003",
+      "tumour_ordinal": 1,
+      "tumour_id_canonical": "LTX0003-Tumour1",
+      "ploidy": 2.1,
+      "n_clones": 1,
+      "samples": [
+        {
+          "sample_name_hash": "LTX0003_SU_T1-R1--a203689682",
+          "region": "R1",
+          "purity": 0.14,
+          "optimal_solution": "purpleDefault_psi2.09_rho0.14"
+        }
+      ]
+    },
+    {
+      "patient_id": "LTX0004",
+      "tumour_ordinal": 1,
+      "tumour_id_canonical": "LTX0004-Tumour1",
+      "ploidy": 3.2,
+      "n_clones": 3,
+      "samples": [
+        {
+          "sample_name_hash": "LTX0004_SU_T1-R1--b3ccabd941",
+          "region": "R1",
+          "purity": 0.55,
+          "optimal_solution": "purpleDefault_psi3.19_rho0.56"
+        }
+      ]
+    },
+    {
+      "patient_id": "LTX0101",
+      "tumour_ordinal": 1,
+      "tumour_id_canonical": "LTX0101-Tumour1",
+      "ploidy": 2.0,
+      "n_clones": 1,
+      "samples": [
+        {
+          "sample_name_hash": "LTX0101_SU_T1-R1--a961170f44",
+          "region": "R1",
+          "purity": 0.88,
+          "optimal_solution": "purpleDefault_psi1.99_rho0.88"
+        }
+      ]
+    },
+    {
+      "patient_id": "LTX0102",
+      "tumour_ordinal": 1,
+      "tumour_id_canonical": "LTX0102-Tumour1",
+      "ploidy": 3.6,
+      "n_clones": 1,
+      "samples": [
+        {
+          "sample_name_hash": "LTX0102_SU_T1-R1--87e2aaccca",
+          "region": "R1",
+          "purity": 0.33,
+          "optimal_solution": "purpleDefault_psi3.61_rho0.33"
+        }
+      ]
+    },
+    {
+      "patient_id": "LTX0103",
+      "tumour_ordinal": 1,
+      "tumour_id_canonical": "LTX0103-Tumour1",
+      "ploidy": 2.9,
+      "n_clones": 2,
+      "samples": [
+        {
+          "sample_name_hash": "LTX0103_SU_T1-R1--0237ebf159",
+          "region": "R1",
+          "purity": 0.6,
+          "optimal_solution": "purpleDefault_psi2.88_rho0.61"
+        },
+        {
+          "sample_name_hash": "LTX0103_SU_T1-R2--2776e94cb6",
+          "region": "R2",
+          "purity": 0.45,
+          "optimal_solution": "purpleDefault_psi2.9_rho0.46"
+        }
+      ]
+    },
+    {
+      "patient_id": "LTX0104",
+      "tumour_ordinal": 1,
+      "tumour_id_canonical": "LTX0104-Tumour1",
+      "ploidy": 2.3,
+      "n_clones": 1,
+      "samples": [
+        {
+          "sample_name_hash": "LTX0104_SU_T1-R1--84ad5706ab",
+          "region": "R1",
+          "purity": 0.5,
+          "optimal_solution": "purpleDefault_psi2.28_rho0.5"
+        }
+      ]
+    },
+    {
+      "patient_id": "LTX0104",
+      "tumour_ordinal": 2,
+      "tumour_id_canonical": "LTX0104-Tumour2",
+      "ploidy": 2.7,
+      "n_clones": 2,
+      "samples": [
+        {
+          "sample_name_hash": "LTX0104_SU_T2-R1--043bc30a48",
+          "region": "R1",
+          "purity": 0.4,
+          "optimal_solution": "purpleDefault_psi2.69_rho0.39"
+        }
+      ]
+    },
+    {
+      "patient_id": "LTX0105",
+      "tumour_ordinal": 1,
+      "tumour_id_canonical": "LTX0105-Tumour1",
+      "ploidy": 2.4,
+      "n_clones": 1,
+      "samples": [
+        {
+          "sample_name_hash": "LTX0105_SU_T1-R1--b1895f54c4",
+          "region": "R1",
+          "purity": 0.09,
+          "optimal_solution": "purpleDefault_psi2.39_rho0.09"
+        }
+      ]
+    }
+  ]
+}

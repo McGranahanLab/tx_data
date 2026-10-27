@@ -31,6 +31,7 @@ def _run(script: Path) -> None:
 @pytest.fixture(scope="module", autouse=True)
 def _build_all():
     _run(SCRIPTS / "generate_mocks.py")
+    _run(SCRIPTS / "generate_mocks_wgs.py")
     _run(SCRIPTS / "build_all.py")
 
 

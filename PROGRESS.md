@@ -15,7 +15,11 @@ canonical store + synthetic `nemo_mock/` for local dev. Downstream projects
   mostly `CN-CCF/wgs_resources`). `_sources.yml` `cohorts:` declares each root;
   every source entry and every `catalog/<table>.yml` carries `cohort:`
   (`wes` / `wgs` / `reference`). All tables so far are `wes`; hg19 tables are
-  `reference`. The build manifest records `table_cohorts`.
+  `reference`. The build manifest records `table_cohorts`. Genome builds:
+  WES hg19 (moving to hg38 soon), WGS hg38. WGS tables are named `wgs_<table>`;
+  WGS mocks come from `scripts/generate_mocks_wgs.py` (own seed, own
+  `nemo_mock/_cohort_manifest_wgs.json`). First WGS table:
+  `wgs_battenberg_inventory` (2026-10-27).
 - **Path resolution**: every root in `_sources.yml` is an absolute `/nemo/...`
   path, re-rooted under `tx_data.paths.nemo_root()` (`TX_NEMO_ROOT` env var,
   then `config/paths.yml` `nemo_root:`, default `nemo_mock/`). `nemo_mock/`

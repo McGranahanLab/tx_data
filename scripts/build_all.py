@@ -39,6 +39,8 @@ TABLES = (
     # _write_manifest discovers both via its special-case fallbacks below.
     "conipher_trees",
     "purity_ploidy",
+    # ---- WGS cohort ----
+    "wgs_battenberg_inventory",
 )
 
 

@@ -31,6 +31,7 @@ Deterministic (fixed seed) so mocks re-generate identically.
 from __future__ import annotations
 
 import gzip
+import io
 import random
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -386,7 +387,8 @@ def _write_muttable(specs: list[TumourSpec]) -> None:
                 ]
                 rows.append(row)
 
-    with gzip.open(out, "wt", newline="\n") as f:
+    # mtime=0 so the gzip header is byte-identical across runs (no git churn).
+    with gzip.GzipFile(out, "wb", mtime=0) as raw, io.TextIOWrapper(raw, newline="\n") as f:
         f.write("\t".join(header) + "\n")
         for r in rows:
             f.write("\t".join(_fmt(x) for x in r) + "\n")

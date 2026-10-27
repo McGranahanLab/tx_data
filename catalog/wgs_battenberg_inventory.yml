@@ -1,0 +1,166 @@
+name: wgs_battenberg_inventory
+cohort: wgs   # TRACERx WGS cohort (see _sources.yml cohorts)
+description: |
+  Per-sample inventory of Battenberg copy-number runs for the WGS cohort.
+  One row per WGS tumour sample: the chosen Battenberg solution, the
+  sample's purity and ploidy, and pointers to the Battenberg results
+  directory, the subclones file, the multi-sample MSAI file and the
+  mosdepth coverage summary, plus a coverage figure.
+
+  This is the entry point for every other WGS copy-number import: the
+  subclones / MSAI / mosdepth files are located through the path columns
+  here, not hardcoded. Path columns keep the absolute `/nemo/...` value
+  (normalised); resolve them for the current build with
+  `tx_data.paths.nemo_path(<path>)`, which maps into `nemo_mock/` in
+  sandbox builds.
+
+provenance:
+  cohort: TRACERx WGS
+  hpc_source: /nemo/project/proj-tracerx-wgs/working/liul/TxWGS/inventory/2026-09-09_battenberg_output_inventory.tsv
+  format_on_source: TSV, header row
+  received: 2026-10-27
+  received_via: Piotr (Slack DM) supplied Nemo path + 1-row head
+  canonical_format: Parquet (after build script)
+  pipeline: Battenberg on WGS (solution label prefix `purpleDefault`), mosdepth for coverage
+
+primary_key:
+  - sample_name_hash
+
+grain: one row per WGS tumour sample
+
+genome_build: hg38
+
+source_columns:
+  # Source → canonical renames applied by the build.
+  PATIENT: patient_id
+  TUMOUR_SAMPLE: sample_name_hash
+  results_dir: results_dir
+  optimal_solution: optimal_solution
+  subclones: subclones_file
+  purity: purity
+  ploidy: ploidy
+  msai: msai_path
+  mosdepth_summary: mosdepth_summary_path
+  coverage: coverage
+
+joins:
+  wes_tables:
+    notes: |
+      Do NOT join to WES tables on `sample_name_hash`: WGS and WES samples
+      of the same biopsy carry different hashes. Patient-level comparisons
+      across cohorts go through `patient_id` / `tumour_id`, and must be
+      done deliberately (different assay, different genome build: WGS is
+      hg38, WES is hg19 for now).
+
+columns:
+  - name: patient_id
+    type: VARCHAR
+    description: "Patient identifier (e.g. `LTX0001`). Source `PATIENT`; build checks it equals the patient parsed from `sample_name_hash`."
+    null_semantics: not_applicable
+
+  - name: tumour_id
+    type: VARCHAR
+    description: |
+      Canonical tumour identifier (e.g. `LTX0001-Tumour1`) derived from the
+      `_SU_T<n>` token of `sample_name_hash`, in the configured
+      `id_convention`.
+    null_semantics: not_applicable
+    derived: true
+
+  - name: region
+    type: VARCHAR
+    description: "Region label (`R1`, `R2`, ...) parsed from the `-R<n>--` token of `sample_name_hash`."
+    null_semantics: not_applicable
+    derived: true
+
+  - name: sample_name_hash
+    type: VARCHAR
+    description: |
+      WGS tumour sample identifier, verbatim from `TUMOUR_SAMPLE`. Format
+      `<LTX|CRUK><digits>_SU_T<tumour_ordinal>-R<region>--<hash>`, e.g.
+      `LTX0001_SU_T1-R1--38da873ff7`. Same shape as the WES hashes but a
+      different hash for the same biopsy. Primary key.
+    null_semantics: not_applicable
+
+  - name: results_dir
+    type: VARCHAR
+    description: "Battenberg results directory for the patient (absolute `/nemo/...`, doubled slashes and trailing slash removed)."
+    null_semantics: not_measured
+
+  - name: optimal_solution
+    type: VARCHAR
+    description: |
+      Label of the Battenberg solution chosen for this sample, e.g.
+      `purpleDefault_psi3.85_rho0.27`. Also embedded in the subclones
+      filename.
+    null_semantics: not_measured
+
+  - name: solution_psi
+    type: DOUBLE
+    description: |
+      `psi` parsed from `optimal_solution` (the `_psi<x>` token). Rounded
+      by the label; use `ploidy` for the precise value.
+    null_semantics: not_applicable
+    derived: true
+    notes: "NULL when the label doesn't follow the `<prefix>_psi<x>_rho<y>` pattern."
+
+  - name: solution_rho
+    type: DOUBLE
+    description: |
+      `rho` parsed from `optimal_solution` (the `_rho<y>` token). Rounded
+      by the label; use `purity` for the precise value.
+    null_semantics: not_applicable
+    derived: true
+    notes: "NULL when the label doesn't follow the `<prefix>_psi<x>_rho<y>` pattern."
+
+  - name: subclones_file
+    type: VARCHAR
+    description: "Bare filename of the Battenberg subclones file (`<sample>_<solution>_subclones.txt.gz`), relative to `results_dir`."
+    null_semantics: not_measured
+
+  - name: subclones_path
+    type: VARCHAR
+    description: "`results_dir` / `subclones_file` as one absolute `/nemo/...` path."
+    null_semantics: not_measured
+    derived: true
+
+  - name: purity
+    type: DOUBLE
+    description: "Battenberg tumour purity (cellularity) for this sample, in (0, 1]."
+    null_semantics: unknown
+
+  - name: ploidy
+    type: DOUBLE
+    description: "Battenberg average tumour ploidy for this sample."
+    null_semantics: unknown
+
+  - name: msai_path
+    type: VARCHAR
+    description: "Path to the patient-level `MSAI/multisample_MSAI.txt` (absolute `/nemo/...`, normalised)."
+    null_semantics: not_measured
+
+  - name: mosdepth_summary_path
+    type: VARCHAR
+    description: "Path to the sample's mosdepth `.mosdepth.summary.txt` (absolute `/nemo/...`, normalised)."
+    null_semantics: not_measured
+
+  - name: coverage
+    type: DOUBLE
+    description: "Sequencing coverage for the sample (x), presumably the mean depth from the mosdepth summary."
+    null_semantics: not_measured
+
+relationships:
+  - column: sample_name_hash
+    references: "future WGS per-sample tables (wgs_*)"
+
+scope_notes: |
+  Tumour samples only (the source has no normal column). The table stores
+  pointers and per-sample scalars; it does not open the referenced files.
+  Their contents become separate `wgs_*` tables.
+
+open_questions:
+  - "What does MSAI stand for, and what is in multisample_MSAI.txt? Is it present for single-sample patients?"
+  - "Is `coverage` the tumour mean depth from the mosdepth summary (total row), or a different statistic? Does it exclude chrX/Y?"
+  - "Why do `purity`/`ploidy` differ slightly from the solution label's rho/psi (0.25893 vs rho0.27)? Rounding, or refit after the label was set?"
+  - "Can a sample have more than one row (several solutions), or is the inventory already one chosen solution per sample?"
+  - "Are there non-standard sample names (lymph node, metastasis, non-`_SU_` tokens) in the WGS cohort?"
