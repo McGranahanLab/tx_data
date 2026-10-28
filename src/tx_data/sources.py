@@ -31,8 +31,11 @@ def load_sources() -> dict:
     return doc
 
 
-def resolve_source(name: str, **fmt: str) -> Path:
+def resolve_source(name: str, pattern_key: str = "relative_path_pattern", **fmt: str) -> Path:
     """Resolve a table's source path (or pattern), applying `{placeholders}`.
+
+    `pattern_key` selects an alternative pattern declared on the same entry
+    (e.g. `relative_path_pattern_single_sample`).
 
     Uses `alt_source_roots` from the registry when the table declares
     `source_root:`.
@@ -57,16 +60,16 @@ def resolve_source(name: str, **fmt: str) -> Path:
             cohort_root=cohort_root,
             alt_source_roots=alt_roots,
         )
-    if "relative_path_pattern" in entry:
+    if pattern_key in entry:
         return resolve_source_pattern(
-            entry["relative_path_pattern"],
+            entry[pattern_key],
             source_root=entry.get("source_root"),
             cohort_root=cohort_root,
             alt_source_roots=alt_roots,
             **fmt,
         )
     raise ValueError(
-        f"Table {name!r} has neither `relative_path` nor `relative_path_pattern`"
+        f"Table {name!r} has neither `relative_path` nor `{pattern_key}`"
     )
 
 

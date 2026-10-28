@@ -15,6 +15,7 @@
       "n_clones": 1,
       "n_segments": 97,
       "segments_header": "major_minor",
+      "msai_adjusted": false,
       "segments_sample_names": [
         "LTX0001_SU_T1.R1"
       ],
@@ -47,6 +48,7 @@
       "n_clones": 1,
       "n_segments": 92,
       "segments_header": "major_minor",
+      "msai_adjusted": false,
       "segments_sample_names": [
         "LTX0002_SU_T1.R1"
       ],
@@ -79,6 +81,7 @@
       "n_clones": 1,
       "n_segments": 104,
       "segments_header": "major_minor",
+      "msai_adjusted": false,
       "segments_sample_names": [
         "LTX0003_SU_T1.R1"
       ],
@@ -111,6 +114,7 @@
       "n_clones": 3,
       "n_segments": 88,
       "segments_header": "major_minor",
+      "msai_adjusted": false,
       "segments_sample_names": [
         "LTX0004_SU_T1.R1"
       ],
@@ -150,6 +154,7 @@
       "n_clones": 1,
       "n_segments": 95,
       "segments_header": "major_minor",
+      "msai_adjusted": false,
       "segments_sample_names": [
         "LTX0101_SU_T1.R1"
       ],
@@ -182,6 +187,7 @@
       "n_clones": 1,
       "n_segments": 99,
       "segments_header": "legacy_A_B",
+      "msai_adjusted": false,
       "segments_sample_names": [
         "LTX0102_SU_T1.R1"
       ],
@@ -214,6 +220,7 @@
       "n_clones": 2,
       "n_segments": 83,
       "segments_header": "major_minor",
+      "msai_adjusted": true,
       "segments_sample_names": [
         "LTX0103_SU_T1.R1",
         "LTX0103_SU_T1.R2"
@@ -260,6 +267,7 @@
       "n_clones": 1,
       "n_segments": 82,
       "segments_header": "major_minor",
+      "msai_adjusted": false,
       "segments_sample_names": [
         "LTX0104_SU_T1.R1"
       ],
@@ -292,6 +300,7 @@
       "n_clones": 2,
       "n_segments": 93,
       "segments_header": "major_minor",
+      "msai_adjusted": false,
       "segments_sample_names": [
         "LTX0104_SU_T2.R1"
       ],
@@ -326,6 +335,7 @@
       "n_clones": 1,
       "n_segments": 92,
       "segments_header": "major_minor",
+      "msai_adjusted": false,
       "segments_sample_names": [
         "LTX0105_SU_T1.R1"
       ],
@@ -358,6 +368,7 @@
       "n_clones": 1,
       "n_segments": 99,
       "segments_header": "major_minor",
+      "msai_adjusted": false,
       "segments_sample_names": [
         "LTX0106_SU_LN1"
       ],

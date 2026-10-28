@@ -7,6 +7,11 @@ description: |
   Consensus segmentation: all samples of a tumour share the same
   breakpoints and segment count.
 
+  Single-sample tumours can't be MSAI-adjusted (the adjustment compares
+  samples). For them the file is
+  `<label>_copynumber_MSAI_NOT_adjusted_segments_tree_input.tsv`, same
+  columns; `msai_adjusted = false` marks those rows.
+
   This is the sample-level fractional CN source for the
   deviation-from-nearest-integer analysis (Piotr, 2026-10-28: use the
   MSAI-adjusted consensus file). For
@@ -16,6 +21,7 @@ provenance:
   cohort: TRACERx WGS
   hpc_source: /nemo/project/proj-tracerx-lung/tctProjects/CN-CCF/battenberg_wgs/output/<wgs_tumour_label>/tree_input/<wgs_tumour_label>_copynumber_MSAI_adjusted_consensus_segments_tree_input.tsv
   format_on_source: TSV, header row, one file per tumour
+  hpc_source_single_sample: /nemo/project/proj-tracerx-lung/tctProjects/CN-CCF/battenberg_wgs/output/<wgs_tumour_label>/tree_input/<wgs_tumour_label>_copynumber_MSAI_NOT_adjusted_segments_tree_input.tsv
   received: 2026-10-27
   received_via: Piotr (Slack DM) supplied tree_input listing + 3-row head; MSAI-adjusted file chosen 2026-10-28
   canonical_format: Parquet (after build script)
@@ -115,6 +121,12 @@ columns:
     null_semantics: unknown
     derived: true
 
+  - name: msai_adjusted
+    type: BOOLEAN
+    description: "true = read from the MSAI-adjusted consensus file; false = single-sample tumour, read from the MSAI_NOT_adjusted file (adjustment can't run on one sample)."
+    null_semantics: not_applicable
+    derived: true
+
 relationships:
   - column: sample_name_hash
     references: wgs_battenberg_inventory.sample_name_hash
@@ -135,3 +147,4 @@ open_questions:
 resolved_questions:
   - "2026-10-28 (Piotr): use the MSAI-adjusted consensus file for the deviation measure."
   - "2026-10-28 (Piotr): legacy COPY_NUMBER_A/_B are always major/minor."
+  - "2026-10-28 (Piotr): single-sample tumours have `_copynumber_MSAI_NOT_adjusted_segments_tree_input.tsv` instead; without it 22/130 production tumours were missing."

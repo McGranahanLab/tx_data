@@ -356,6 +356,9 @@ sources:
     cohort: wgs
     source_root: battenberg_wgs_output
     relative_path_pattern: "{wgs_tumour_label}/tree_input/{wgs_tumour_label}_copynumber_MSAI_adjusted_consensus_segments_tree_input.tsv"
+    # Single-sample tumours: MSAI adjustment can't run, so the final file is
+    # named differently (Piotr, 2026-10-28). Read when the adjusted file is absent.
+    relative_path_pattern_single_sample: "{wgs_tumour_label}/tree_input/{wgs_tumour_label}_copynumber_MSAI_NOT_adjusted_segments_tree_input.tsv"
     format: tsv
     header: true
     per_tumour: true
@@ -368,7 +371,12 @@ sources:
       segments (from tree_input/). Consensus segmentation: every sample of
       a tumour has the same breakpoints and segment count. Piotr's chosen
       source for the deviation-from-integer analysis (2026-10-28; replaces
-      the unadjusted `_copynumber_consensus_segments_tree_input.tsv`). One row per (sample × consensus
+      the unadjusted `_copynumber_consensus_segments_tree_input.tsv`).
+      Single-sample tumours have no MSAI-adjusted file (the adjustment
+      needs several samples); their final file is
+      `<label>_copynumber_MSAI_NOT_adjusted_segments_tree_input.tsv`, same
+      columns. Without this fallback 22/130 production tumours were
+      dropped (Piotr, 2026-10-28). One row per (sample × consensus
       segment). Columns: SAMPLE, CHR, STARTPOS, ENDPOS, COPY_NUMBER_MAJOR,
       COPY_NUMBER_MINOR. Older files use COPY_NUMBER_A / COPY_NUMBER_B
       for the same two columns, always major/minor (Piotr, 2026-10-28). SAMPLE is a short form of the inventory

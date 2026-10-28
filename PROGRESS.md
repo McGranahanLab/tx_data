@@ -29,7 +29,8 @@ canonical store + synthetic `nemo_mock/` for local dev. Downstream projects
   CN from Battenberg `tree_input/`) and `wgs_clone_proportions` (ALPACA input
   cp_table). Both discover tumours from the built inventory; sample names in
   other sources are matched via `tx_data.wgs_samples.match_sample`.
-  2026-10-28: segments now come from the MSAI-adjusted consensus file, and
+  2026-10-28: segments come from the MSAI-adjusted consensus file (single-sample
+  tumours: `_MSAI_NOT_adjusted_segments_tree_input.tsv`, flagged `msai_adjusted`), and
   `wgs_tree_clones` (ALPACA `tree_paths.json`) defines single-clone tumours
   (`n_clones_tree = 1`). Pending: ALPACA output (integer clone CN), remaining
   tree_input / alpaca input files.
