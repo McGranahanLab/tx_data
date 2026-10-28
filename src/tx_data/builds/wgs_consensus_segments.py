@@ -96,7 +96,7 @@ def build() -> pl.DataFrame:
         frames.append(_read_one(label, path))
     log(f"read consensus segments for {len(frames)}/{tumours.height} WGS tumours")
     if absent:
-        log(f"warning: no consensus segments file for {len(absent)} tumour(s): {absent[:10]}")
+        log(f"warning: no consensus segments file for {len(absent)} tumour(s): {absent}")
 
     if not frames:
         df = pl.DataFrame(schema=SCHEMA)

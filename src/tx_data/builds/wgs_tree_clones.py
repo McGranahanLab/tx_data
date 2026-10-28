@@ -78,7 +78,7 @@ def build() -> pl.DataFrame:
         n_read += 1
     log(f"read tree_paths.json for {n_read}/{tumours.height} WGS tumours")
     if absent:
-        log(f"warning: no tree_paths.json for {len(absent)} tumour(s): {absent[:10]}")
+        log(f"warning: no tree_paths.json for {len(absent)} tumour(s): {absent}")
 
     if not rows:
         df = pl.DataFrame(schema=SCHEMA)

@@ -55,7 +55,7 @@ def build() -> pl.DataFrame:
         )
     log(f"read cp_table for {len(frames)}/{tumours.height} WGS tumours")
     if absent:
-        log(f"warning: no cp_table.csv for {len(absent)} tumour(s): {absent[:10]}")
+        log(f"warning: no cp_table.csv for {len(absent)} tumour(s): {absent}")
 
     if not frames:
         df = pl.DataFrame(schema=SCHEMA)
