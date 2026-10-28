@@ -1,4 +1,5 @@
 name: kallisto
+cohort: wes   # TRACERx WES (multi-region exome) cohort (see _sources.yml cohorts)
 description: |
   Kallisto-quantified gene-level expression for the Tx842 mets RNA-seq cohort.
   Two matched wide-format matrices: counts and TPM. Same schema — rows are

@@ -1,8 +1,10 @@
 name: purity_ploidy
+cohort: wes   # TRACERx WES (multi-region exome) cohort (see _sources.yml cohorts)
 description: |
   Per-region (per-sample) purity and ploidy estimates for Tx842 tumour
   samples. One row per sequencing region. Values match whatever upstream
-  QC pipeline produced them (likely ASCAT or Battenberg on WGS).
+  QC pipeline produced them (caller TBC; likely ASCAT). WES cohort —
+  the earlier "on WGS" note was an unverified guess.
 
   The source carries only an opaque `sample_name_hash` column. The build
   script resolves each hash via `sample_hash_map` to obtain canonical
@@ -17,7 +19,7 @@ provenance:
   received: 2026-10-20
   received_via: User (Discord) supplied Nemo path + 2-row head
   canonical_format: Parquet (after build script)
-  pipeline: upstream per-sample QC (ASCAT / Battenberg on WGS, TBC)
+  pipeline: upstream per-sample QC on WES (caller TBC, likely ASCAT)
   schema_evolution: |
     2026-10-21 — switched from regex-based parsing of `sample_name_hash`
     to explicit `sample_hash_map` lookup (brittle: hashes contain

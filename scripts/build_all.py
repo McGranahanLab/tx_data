@@ -1,8 +1,9 @@
 """Build every canonical Parquet from source, in dependency order.
 
-Writes a `data/_build_manifest.json` at the end recording the data_root
-used, the TX_DATA_ROOT env var seen, whether this was a mock build, the
-timestamp, and per-table row counts. Downstream consumers (e.g.
+Writes a `data/_build_manifest.json` at the end recording the nemo_root
+and WES data_root used, the TX_NEMO_ROOT env var seen, whether this was a
+mock build, the timestamp, per-table cohort (wes / wgs / reference) and
+per-table row counts. Downstream consumers (e.g.
 mut_essential_wgd/run_analysis.py) read this to prove which cohort a
 given set of parquets came from.
 """
@@ -38,6 +39,12 @@ TABLES = (
     # _write_manifest discovers both via its special-case fallbacks below.
     "conipher_trees",
     "purity_ploidy",
+    # ---- WGS cohort ----
+    # Inventory first: the other WGS builds discover tumours and samples from it.
+    "wgs_battenberg_inventory",
+    "wgs_consensus_segments",
+    "wgs_clone_proportions",
+    "wgs_tree_clones",
 )
 
 
@@ -56,7 +63,7 @@ def _apply_build_mode(mode: str | None) -> None:
     root = build_root_for_mode(mode)
     if root is None:
         return
-    os.environ["TX_DATA_ROOT"] = str(root)
+    os.environ["TX_NEMO_ROOT"] = str(root)
 
 
 def _write_manifest(
@@ -87,18 +94,23 @@ def _write_manifest(
                 if p2.is_file():
                     row_counts[sub] = pl.read_parquet(p2).height
 
+    from tx_data.catalog import load_catalog
+    from tx_data.paths import nemo_root
+
     manifest = {
         "built_at_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "nemo_root": str(nemo_root()),
         "data_root": str(data_root_fn()),
         "data_root_is_mock": data_root_is_mock_fn(),
-        "env_TX_DATA_ROOT": os.environ.get("TX_DATA_ROOT"),
+        "env_TX_NEMO_ROOT": os.environ.get("TX_NEMO_ROOT"),
+        "table_cohorts": {name: load_catalog(name)["cohort"] for name in TABLES},
         "table_row_counts": row_counts,
     }
     manifest_path = data_dir / "_build_manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
     log_fn(f"wrote {manifest_path}")
     log_fn(
-        f"data_root={manifest['data_root']} "
+        f"nemo_root={manifest['nemo_root']} "
         f"is_mock={manifest['data_root_is_mock']} "
         f"tables={row_counts}"
     )

@@ -14,8 +14,9 @@ At the start of every session, read in this order:
 
 ## Golden rules
 
-- **Never hardcode `/Nemo` paths.** Resolve via `tx_data.paths.data_root()`.
-- **`nemo_mock/` mirrors `/Nemo` exactly.** Same directory structure, synthetic values only.
+- **Never hardcode `/nemo` paths.** Declare roots in `catalog/_sources.yml`; resolve via `tx_data.sources.resolve_source()`.
+- **`nemo_mock/` mirrors `/nemo` exactly.** `/nemo/<rest>` ↔ `nemo_mock/<rest>`. Same directory structure, synthetic values only.
+- **Every table belongs to a cohort.** `cohort: wes | wgs | reference` in both `_sources.yml` and `catalog/<table>.yml`. Never mix WES and WGS tables silently.
 - **ETL scripts are idempotent.** Re-running produces byte-identical Parquet (modulo the sidecar timestamp).
 - **The catalog is the truth.** Every canonical table has a YAML entry with per-column semantics, NULL rules, and provenance.
 - **Never propagate source column names.** Rename to snake_case during ETL.

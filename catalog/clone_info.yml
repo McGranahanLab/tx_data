@@ -1,4 +1,5 @@
 name: clone_info
+cohort: wes   # TRACERx WES (multi-region exome) cohort (see _sources.yml cohorts)
 description: |
   Per (tumour × clone) classification flags derived from the CONIPHER +
   seeding-classification pipeline used by the ALPACA paper. Each row tells

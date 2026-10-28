@@ -15,6 +15,10 @@ from tx_data.builds import (
     purity_ploidy,
     seeding_table,
     wgd_calls,
+    wgs_battenberg_inventory,
+    wgs_clone_proportions,
+    wgs_consensus_segments,
+    wgs_tree_clones,
 )
 
 __all__ = [
@@ -32,6 +36,10 @@ __all__ = [
     "hg19_refgene",
     "conipher_trees",
     "purity_ploidy",
+    "wgs_battenberg_inventory",
+    "wgs_consensus_segments",
+    "wgs_clone_proportions",
+    "wgs_tree_clones",
 ]
 
 BUILDERS = {
@@ -49,4 +57,8 @@ BUILDERS = {
     "hg19_refgene": hg19_refgene.build,
     "conipher_trees": conipher_trees.build,
     "purity_ploidy": purity_ploidy.build,
+    "wgs_battenberg_inventory": wgs_battenberg_inventory.build,
+    "wgs_consensus_segments": wgs_consensus_segments.build,
+    "wgs_clone_proportions": wgs_clone_proportions.build,
+    "wgs_tree_clones": wgs_tree_clones.build,
 }

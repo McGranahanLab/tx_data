@@ -1,4 +1,5 @@
 name: id_crosswalk
+cohort: wes   # TRACERx WES (multi-region exome) cohort (see _sources.yml cohorts)
 description: |
   Patient-level TRACERx identifier crosswalk. Maps the two identifier systems
   that appear across Tx842-related assets:

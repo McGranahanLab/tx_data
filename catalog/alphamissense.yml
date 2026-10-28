@@ -1,4 +1,5 @@
 name: alphamissense
+cohort: wes   # TRACERx WES (multi-region exome) cohort (see _sources.yml cohorts)
 description: |
   AlphaMissense pathogenicity annotations for Tx842 mutations, produced by
   running Ensembl VEP (v115.2) with the AlphaMissense plugin on the muttable

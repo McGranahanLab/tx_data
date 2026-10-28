@@ -1,4 +1,5 @@
 name: muttable
+cohort: wes   # TRACERx WES (multi-region exome) cohort (see _sources.yml cohorts)
 description: |
   TRACERx Tx842 cohort mutation table. One row per (mutation, sample) pair — i.e.
   long format. Every mutation appears in every sample of its patient/tumour, even

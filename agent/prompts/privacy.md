@@ -6,7 +6,7 @@ Real TRACERx data on `/Nemo` is patient data under strict access controls. Non-n
 
 - Local dev uses `nemo_mock/` only. Synthetic, non-identifiable.
 - The agent never sees real data during code development.
-- Real-data execution happens exclusively on the HPC with `TX_DATA_ROOT=/Nemo`.
+- Real-data execution happens exclusively on the HPC with `TX_NEMO_ROOT=/nemo` (or `pixi run build prod`).
 
 ## LLM boundary (when we add the assistant)
 

@@ -1,4 +1,8 @@
-"""Generate synthetic mock cohort into ``nemo_mock/``.
+"""Generate the synthetic WES mock cohort into ``nemo_mock/``.
+
+``nemo_mock/`` mirrors ``/nemo``; WES release files land under
+``nemo_mock/project/proj-tracerx-lung/tctProjects/lungTx/Tx842/release/tracerx_842/``
+(``MOCK_ROOT`` below), alt roots under their own mirrored paths.
 
 Produces four coherent tables spanning every meaningful edge case:
 
@@ -14,11 +18,12 @@ Produces four coherent tables spanning every meaningful edge case:
     fixed lists so we can assert on them in tests)
   - Every variant class: SNV missense, SNV synonymous, SNV nonsense, indel
 
-Files written under ``nemo_mock/``:
+Files written under ``MOCK_ROOT`` (WES release tree):
   - ``tx842_mutation_table.tsv.gz``  (long format, one row per mutation×sample)
   - ``WGD/release_tx842/WGD_calls.tsv``
   - ``tx842_clinical.tsv``
-  - ``alt/cn_ccf_alphamissense/output/annotated_muttables/tx842/<tumour_muttable_form>_muttable_alpha.tsv``
+  - ``CN-CCF/alphamissense/output/annotated_muttables/tx842/<tumour_muttable_form>_muttable_alpha.tsv``
+    (under ``tctProjects/``, outside the release tree)
 
 Deterministic (fixed seed) so mocks re-generate identically.
 """
@@ -26,18 +31,24 @@ Deterministic (fixed seed) so mocks re-generate identically.
 from __future__ import annotations
 
 import gzip
+import io
 import random
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from tx_data.paths import REPO_ROOT
 
-MOCK_ROOT = REPO_ROOT / "nemo_mock"
-AM_ROOT = MOCK_ROOT / "alt" / "cn_ccf_alphamissense" / "output" / "annotated_muttables" / "tx842"
+# nemo_mock/ mirrors /nemo 1:1. MANIFEST_DIR holds mock-only metadata (not
+# part of the mirror); WES_ROOT is the WES release tree (tracerx_842), which
+# is where every non-alt WES source lives.
+MANIFEST_DIR = REPO_ROOT / "nemo_mock"
+MOCK_TCT = MANIFEST_DIR / "project" / "proj-tracerx-lung" / "tctProjects"
+MOCK_ROOT = MOCK_TCT / "lungTx" / "Tx842" / "release" / "tracerx_842"
+AM_ROOT = MOCK_TCT / "CN-CCF" / "alphamissense" / "output" / "annotated_muttables" / "tx842"
 WGD_DIR = MOCK_ROOT / "WGD" / "release_tx842"
 ALPACA_DIR = MOCK_ROOT / "ALPACA" / "output" / "cohort_results"
 CLONE_PROP_ROOT = MOCK_ROOT / "ALPACA" / "input"
-KALLISTO_DIR = MOCK_ROOT / "alt" / "tx842_mets_rnaseq" / "_aggregate" / "kallisto_mat"
+KALLISTO_DIR = MOCK_TCT / "lungTx" / "Tx842" / "release" / "tx842_mets_rnaseq" / "_aggregate" / "kallisto_mat"
 SAMPLE_MAP_DIR = MOCK_ROOT / "mapping_files"
 
 RNG = random.Random(20260831)
@@ -376,7 +387,8 @@ def _write_muttable(specs: list[TumourSpec]) -> None:
                 ]
                 rows.append(row)
 
-    with gzip.open(out, "wt", newline="\n") as f:
+    # mtime=0 so the gzip header is byte-identical across runs (no git churn).
+    with gzip.GzipFile(out, "wb", mtime=0) as raw, io.TextIOWrapper(raw, newline="\n") as f:
         f.write("\t".join(header) + "\n")
         for r in rows:
             f.write("\t".join(_fmt(x) for x in r) + "\n")
@@ -948,7 +960,7 @@ def _write_clone_proportions(specs: list[TumourSpec]) -> None:
 
 
 def _write_purity_ploidy(specs: list[TumourSpec]) -> None:
-    """Emit `nemo_mock/tx842_purity_ploidy.csv`.
+    """Emit `<MOCK_ROOT>/tx842_purity_ploidy.csv`.
 
     One row per sequencing region for every resolved tumour. Uses the same
     `_SU_T{n}-R{r}--<hash>` convention as muttable / kallisto / clone_proportions.
@@ -981,7 +993,7 @@ def _write_purity_ploidy(specs: list[TumourSpec]) -> None:
 
 
 def _write_sample_hash_map() -> None:
-    """Emit `nemo_mock/mapping_files/tx842_samplehash_tumour_lesion_map.tsv`.
+    """Emit `<MOCK_ROOT>/mapping_files/tx842_samplehash_tumour_lesion_map.tsv`.
 
     Draws from `_HASH_LEDGER`, which collects every tumour-sample hash minted
     across the other mock emitters so the mapping is consistent with every
@@ -1016,6 +1028,7 @@ def _write_cohort_manifest(specs: list[TumourSpec]) -> None:
 
     manifest = {
         "schema_version": 1,
+        "cohort": "wes",
         "cohort_tag": "Tx842_mock",
         "random_seed": 20260831,
         "tumours": [
@@ -1035,13 +1048,14 @@ def _write_cohort_manifest(specs: list[TumourSpec]) -> None:
             for spec in specs
         ],
     }
-    out = MOCK_ROOT / "_cohort_manifest.json"
+    out = MANIFEST_DIR / "_cohort_manifest.json"
     out.write_text(json.dumps(manifest, indent=2))
     print(f"wrote {out} ({len(manifest['tumours'])} tumours)")
 
 
 def main() -> None:
     MOCK_ROOT.mkdir(parents=True, exist_ok=True)
+    MANIFEST_DIR.mkdir(parents=True, exist_ok=True)
     specs = cohort()
     print(f"cohort: {len(specs)} tumours across {len({s.patient_id for s in specs})} patients")
 
@@ -1058,7 +1072,7 @@ def main() -> None:
     _write_cohort_manifest(specs)
     print("done.")
     print(
-        "note: `conipher_trees` mock (`nemo_mock/tx842_trees.RDS`) is produced by\n"
+        "note: `conipher_trees` mock (`<MOCK_ROOT>/tx842_trees.RDS`) is produced by\n"
         "      `Rscript scripts/generate_mock_conipher_trees.R` — requires an R env\n"
         "      with the `jsonlite` package (e.g. the tx800_alpaca_replica pixi env)."
     )

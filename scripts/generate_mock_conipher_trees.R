@@ -1,5 +1,5 @@
 #!/usr/bin/env Rscript
-# Generate a synthetic `tx842_trees.RDS` under `nemo_mock/`, matching the
+# Generate a synthetic `tx842_trees.RDS` in the WES release tree of `nemo_mock/` (mirrors /nemo), matching the
 # per-patient bundle shape observed in the real Tx842 release
 # (`/nemo/project/proj-tracerx-lung/tctProjects/lungTx/Tx842/release/tracerx_842/tx842_trees.RDS`).
 #
@@ -39,9 +39,12 @@ suppressPackageStartupMessages({
 })()
 
 repo_root <- normalizePath(file.path(.script_dir, ".."))
+# nemo_mock/ mirrors /nemo; the RDS lives in the WES release tree.
 mock_root <- file.path(repo_root, "nemo_mock")
+wes_root <- file.path(mock_root, "project", "proj-tracerx-lung", "tctProjects",
+                      "lungTx", "Tx842", "release", "tracerx_842")
 manifest_path <- file.path(mock_root, "_cohort_manifest.json")
-out_path <- file.path(mock_root, "tx842_trees.RDS")
+out_path <- file.path(wes_root, "tx842_trees.RDS")
 
 if (!file.exists(manifest_path)) {
   stop(sprintf(

@@ -1,5 +1,6 @@
 {
   "schema_version": 1,
+  "cohort": "wes",
   "cohort_tag": "Tx842_mock",
   "random_seed": 20260831,
   "tumours": [

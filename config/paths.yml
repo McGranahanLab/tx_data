@@ -1,10 +1,13 @@
 # Path config for tx_data.
 #
-# `data_root` is where the cohort source files live. `nemo_mock/` is the
-# default (synthetic mimic checked in for local dev). Override on the HPC:
-#   export TX_DATA_ROOT=/nemo/project/proj-tracerx-lung/tctProjects/lungTx/Tx842/release/tracerx_842
+# `nemo_root` stands in for the `/nemo` mount. Every source path in
+# `catalog/_sources.yml` is an absolute `/nemo/...` path re-rooted under it.
+# `nemo_mock/` (default) mirrors `/nemo` 1:1 with synthetic data for local
+# dev; it holds both the WES and the WGS cohort trees. Override on the HPC:
+#   export TX_NEMO_ROOT=/nemo
+# or use `pixi run build prod`.
 
-data_root: nemo_mock
+nemo_root: nemo_mock
 
 # Global switch for which tumour-id form is emitted in canonical Parquet.
 # - `ltx`  : `LTX0001-Tumour1` (tx_data legacy; matches wgd_calls / alpaca / muttable)

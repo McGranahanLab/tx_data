@@ -10,10 +10,37 @@ canonical store + synthetic `nemo_mock/` for local dev. Downstream projects
 
 ## Design (locked)
 
-- **Path resolution**: `tx_data.paths.data_root()` reads `TX_DATA_ROOT` env var
-  first, then falls back to `config/paths.yml`. Default `nemo_mock/`.
+- **Cohorts** (2026-10-27): two sequencing cohorts, `wes` (multi-region exome,
+  Tx842 release `lungTx/Tx842/release/tracerx_842`) and `wgs` (whole genome,
+  mostly `CN-CCF/wgs_resources`). `_sources.yml` `cohorts:` declares each root;
+  every source entry and every `catalog/<table>.yml` carries `cohort:`
+  (`wes` / `wgs` / `reference`). All tables so far are `wes`; hg19 tables are
+  `reference`. The build manifest records `table_cohorts`. Genome builds:
+  WES hg19 (moving to hg38 soon), WGS hg38. WGS tables are named `wgs_<table>`;
+  WGS mocks come from `scripts/generate_mocks_wgs.py` (own seed, own
+  `nemo_mock/_cohort_manifest_wgs.json`). First WGS table:
+  `wgs_battenberg_inventory` (2026-10-27).
+- **WGS tumour labels** (2026-10-27): WGS sources (inventory `PATIENT`, Battenberg
+  folder names) label tumours as bare `LTX0001` (single tumour) or
+  `LTX0002_tumour<n>`. Canonical WGS tables standardise to WES form via
+  `tx_data.ids.wgs_tumour_id` (`LTX0001-Tumour1`) and keep the raw string as
+  `wgs_tumour_label` for locating files.
+- **WGS CN tables** (2026-10-27): `wgs_consensus_segments` (fractional sample-level
+  CN from Battenberg `tree_input/`) and `wgs_clone_proportions` (ALPACA input
+  cp_table). Both discover tumours from the built inventory; sample names in
+  other sources are matched via `tx_data.wgs_samples.match_sample`.
+  2026-10-28: segments now come from the MSAI-adjusted consensus file, and
+  `wgs_tree_clones` (ALPACA `tree_paths.json`) defines single-clone tumours
+  (`n_clones_tree = 1`). Pending: ALPACA output (integer clone CN), remaining
+  tree_input / alpaca input files.
+- **Path resolution**: every root in `_sources.yml` is an absolute `/nemo/...`
+  path, re-rooted under `tx_data.paths.nemo_root()` (`TX_NEMO_ROOT` env var,
+  then `config/paths.yml` `nemo_root:`, default `nemo_mock/`). `nemo_mock/`
+  mirrors `/nemo` 1:1, so WES, WGS and alt roots all mock the same way.
+  `TX_DATA_ROOT` is retired and raises if set. `data_root()` still returns the
+  WES release root.
 - **Alt source roots**: `catalog/_sources.yml` `alt_source_roots:` map lets a
-  table declare `source_root: <alias>` to live outside the main release tree
+  table declare `source_root: <alias>` to live outside its cohort's main tree
   (used for AlphaMissense at `CN-CCF/alphamissense/…`).
 - **Canonical IDs**:
   - `tumour_id` canonical form: `LTX0001-Tumour1` (matches wgd_calls).
@@ -71,9 +98,9 @@ Legend: ✅ done · ⏳ in progress or todo.
 ```
 src/tx_data/
 ├── __init__.py
-├── paths.py          # data_root(), alt_root(alias)
+├── paths.py          # nemo_root(), nemo_path(), data_root() (WES)
 ├── catalog.py        # load_catalog(name) → dict; load_all() → dict[str,dict]
-├── sources.py        # load_sources() → dict; resolve_source(name)
+├── sources.py        # load_sources(); resolve_source(name); source_cohort(); cohort_root()
 ├── normalize.py      # canonical tumour_id / clone helpers
 └── builds/
     ├── __init__.py

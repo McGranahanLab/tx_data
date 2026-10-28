@@ -1,4 +1,5 @@
 name: clone_proportions
+cohort: wes   # TRACERx WES (multi-region exome) cohort (see _sources.yml cohorts)
 description: |
   CONIPHER-derived per-sample clone composition for each tumour. Every row is
   a (tumour × clone × sample) triple: the proportion of `sample` that is

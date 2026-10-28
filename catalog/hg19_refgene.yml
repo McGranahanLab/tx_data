@@ -1,4 +1,5 @@
 name: hg19_refgene
+cohort: reference   # cohort-independent reference data (see _sources.yml)
 description: |
   Full hg19 gene annotation table — one row per (gene × chromosome),
   with genomic interval and cytoband. Built from UCSC ``refGene.txt.gz``
