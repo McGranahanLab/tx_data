@@ -1,4 +1,4 @@
-"""wgs_consensus_segments + wgs_clone_proportions on the WGS mock.
+"""wgs_consensus_segments + wgs_clone_proportions + wgs_tree_clones on the WGS mock.
 
 Self-contained: regenerates the WGS mock and builds the inventory first,
 since both tables discover tumours and samples from it.
@@ -29,6 +29,7 @@ def built():
     out = {
         "seg": BUILDERS["wgs_consensus_segments"](),
         "cp": BUILDERS["wgs_clone_proportions"](),
+        "tree": BUILDERS["wgs_tree_clones"](),
         "manifest": json.loads(MANIFEST.read_text()),
     }
     yield out
@@ -87,3 +88,44 @@ def test_single_clone_tumours_identifiable(built):
     n = cp.group_by("tumour_id").agg(pl.col("clone").n_unique().alias("n"))
     single = set(n.filter(pl.col("n") == 1)["tumour_id"])
     assert single == {t["tumour_id_canonical"] for t in m["tumours"] if t["n_clones"] == 1}
+
+
+def test_samples_share_consensus_segmentation(built):
+    seg = built["seg"]
+    layouts = (seg.group_by("tumour_id", "sample")
+               .agg(pl.concat_str("chr", "start", "end", separator=":").sort().alias("s"))
+               .group_by("tumour_id").agg(pl.col("s").n_unique().alias("n")))
+    assert (layouts["n"] == 1).all()
+
+
+def test_tree_clones_match_manifest(built):
+    tree, m = built["tree"], built["manifest"]
+    for t in m["tumours"]:
+        sub = tree.filter(pl.col("tumour_id") == t["tumour_id_canonical"])
+        assert set(sub["clone"]) == {c for p in t["tree_paths"] for c in p}
+        assert (sub["n_clones_tree"] == t["n_clones"]).all()
+        trunk = sub.filter(pl.col("is_trunk"))
+        assert trunk["clone"].to_list() == ["clone1"] and trunk["parent_clone"].null_count() == 1
+        leaves = set(sub.filter(pl.col("is_leaf"))["clone"])
+        assert leaves == {p[-1] for p in t["tree_paths"]}
+
+
+def test_single_clone_from_tree(built):
+    tree, m = built["tree"], built["manifest"]
+    single = set(tree.filter(pl.col("n_clones_tree") == 1)["tumour_id"])
+    assert single == {t["tumour_id_canonical"] for t in m["tumours"] if t["n_clones"] == 1}
+
+
+def test_tree_paths_rejects_bad_files(tmp_path):
+    from tx_data.builds.wgs_tree_clones import _read_one
+
+    f = tmp_path / "tree_paths.json"
+    f.write_text('[["clone1", "clone2"], ["clone9", "clone3"]]')
+    with pytest.raises(ValueError, match="different clones"):
+        _read_one("X", f)
+    f.write_text('[["clone1", "clone2", "clone4"], ["clone1", "clone3", "clone4"]]')
+    with pytest.raises(ValueError, match="inconsistent parents"):
+        _read_one("X", f)
+    f.write_text('[["clone1"]]')
+    (row,) = _read_one("X", f)
+    assert row["is_trunk"] and row["is_leaf"] and row["n_clones_tree"] == 1

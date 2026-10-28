@@ -28,8 +28,11 @@ canonical store + synthetic `nemo_mock/` for local dev. Downstream projects
 - **WGS CN tables** (2026-10-27): `wgs_consensus_segments` (fractional sample-level
   CN from Battenberg `tree_input/`) and `wgs_clone_proportions` (ALPACA input
   cp_table). Both discover tumours from the built inventory; sample names in
-  other sources are matched via `tx_data.wgs_samples.match_sample`. Pending:
-  ALPACA output (integer clone CN), remaining tree_input / alpaca input files.
+  other sources are matched via `tx_data.wgs_samples.match_sample`.
+  2026-10-28: segments now come from the MSAI-adjusted consensus file, and
+  `wgs_tree_clones` (ALPACA `tree_paths.json`) defines single-clone tumours
+  (`n_clones_tree = 1`). Pending: ALPACA output (integer clone CN), remaining
+  tree_input / alpaca input files.
 - **Path resolution**: every root in `_sources.yml` is an absolute `/nemo/...`
   path, re-rooted under `tx_data.paths.nemo_root()` (`TX_NEMO_ROOT` env var,
   then `config/paths.yml` `nemo_root:`, default `nemo_mock/`). `nemo_mock/`

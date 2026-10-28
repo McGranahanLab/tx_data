@@ -1,14 +1,18 @@
 """Build wgs_consensus_segments → canonical Parquet.
 
-Fractional allele-specific copy number per WGS sample on consensus
-segments, read from each tumour's Battenberg `tree_input/` folder:
+MSAI-adjusted fractional allele-specific copy number per WGS sample on
+consensus segments, read from each tumour's Battenberg `tree_input/` folder:
 
-  battenberg_wgs/output/<label>/tree_input/<label>_copynumber_consensus_segments_tree_input.tsv
+  battenberg_wgs/output/<label>/tree_input/<label>_copynumber_MSAI_adjusted_consensus_segments_tree_input.tsv
+
+Consensus segmentation: every sample of a tumour has the same breakpoints;
+the build logs any tumour where that doesn't hold.
 
 Tumours are discovered from the built `wgs_battenberg_inventory` (one file
 per `wgs_tumour_label`), not by globbing, so a missing file is reported
 instead of silently absent. Source columns COPY_NUMBER_MAJOR / _MINOR are
-also accepted under their legacy names COPY_NUMBER_A / _B.
+also accepted under their legacy names COPY_NUMBER_A / _B (always
+major/minor, Piotr 2026-10-28).
 
 Source `SAMPLE` is a short form of the sample name (`LTX0001_SU_T1.R1`);
 it is matched to the inventory `sample_name_hash` within the tumour via
@@ -124,6 +128,15 @@ def build() -> pl.DataFrame:
         inverted = df.filter(pl.col("cn_major") < pl.col("cn_minor")).height
         if inverted:
             log(f"note: {inverted} row(s) with cn_major < cn_minor (kept as on source)")
+        per_sample = (
+            df.group_by("tumour_id", "sample")
+            .agg(pl.concat_str("chr", "start", "end", separator=":").sort().alias("segs"))
+            .group_by("tumour_id").agg(pl.col("segs").n_unique().alias("n_layouts"))
+            .filter(pl.col("n_layouts") > 1)
+        )
+        if per_sample.height:
+            log(f"warning: samples don't share one segmentation in {per_sample.height} "
+                f"tumour(s): {per_sample['tumour_id'].to_list()[:10]}")
         dupes = (
             df.group_by("wgs_tumour_label", "sample", "chr", "start")
             .len().filter(pl.col("len") > 1)

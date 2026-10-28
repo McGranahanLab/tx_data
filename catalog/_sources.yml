@@ -355,7 +355,7 @@ sources:
   wgs_consensus_segments:
     cohort: wgs
     source_root: battenberg_wgs_output
-    relative_path_pattern: "{wgs_tumour_label}/tree_input/{wgs_tumour_label}_copynumber_consensus_segments_tree_input.tsv"
+    relative_path_pattern: "{wgs_tumour_label}/tree_input/{wgs_tumour_label}_copynumber_MSAI_adjusted_consensus_segments_tree_input.tsv"
     format: tsv
     header: true
     per_tumour: true
@@ -364,15 +364,33 @@ sources:
     received: 2026-10-27
     received_via: Piotr (Slack DM) supplied tree_input listing + 3-row head
     notes: |
-      Fractional allele-specific CN per sample on consensus segments
-      (from tree_input/). Piotr's chosen source for the deviation-from-
-      integer analysis (2026-10-27). One row per (sample × consensus
+      MSAI-adjusted fractional allele-specific CN per sample on consensus
+      segments (from tree_input/). Consensus segmentation: every sample of
+      a tumour has the same breakpoints and segment count. Piotr's chosen
+      source for the deviation-from-integer analysis (2026-10-28; replaces
+      the unadjusted `_copynumber_consensus_segments_tree_input.tsv`). One row per (sample × consensus
       segment). Columns: SAMPLE, CHR, STARTPOS, ENDPOS, COPY_NUMBER_MAJOR,
       COPY_NUMBER_MINOR. Older files use COPY_NUMBER_A / COPY_NUMBER_B
-      for the same two columns. SAMPLE is a short form of the inventory
+      for the same two columns, always major/minor (Piotr, 2026-10-28). SAMPLE is a short form of the inventory
       sample name (`LTX0001_SU_T1.R1` vs `LTX0001_SU_T1-R1--<hash>`).
-      Sibling files in tree_input/ (mutations, MSAI-adjusted segments,
+      Sibling files in tree_input/ (mutations, unadjusted segments,
       lost coverage, segmentation report) are not imported yet.
+
+  wgs_tree_clones:
+    cohort: wgs
+    relative_path_pattern: "alpaca/input/{wgs_tumour_label}/tree_paths.json"
+    format: json
+    per_tumour: true
+    per_tumour_discovery: wgs_battenberg_inventory
+    tumour_id_form: "wgs_tumour_label (LTX0001 / LTX0002_tumour1)"
+    received: 2026-10-28
+    received_via: Piotr (Slack DM) - single-clone calls count clones on the tree
+    notes: |
+      ALPACA phylogeny input: a JSON list of paths, each a list of clone
+      IDs from the trunk (MRCA) to a leaf, e.g.
+      [["clone1","clone2"],["clone1","clone3"]]; a single-clone tumour is
+      [["clone1"]] (format per ALPACA-model README). Clone count on the tree
+      is Piotr's definition of single-clone (2026-10-28).
 
   wgs_clone_proportions:
     cohort: wgs
@@ -389,6 +407,6 @@ sources:
       `clone_proportions` source (N sample columns + trailing `clone`
       column, proportions in [0, 1]). Other files in alpaca/input/<label>/
       (ALPACA_input_table.csv, ci_table.csv, phased_segs.tsv,
-      precomputed_ci.tsv, tree_paths.json, segments/, reports) are not
-      imported yet. ALPACA output lives in alpaca/output (structure TBC).
+      precomputed_ci.tsv, segments/, reports) are not imported yet;
+      tree_paths.json is `wgs_tree_clones`. ALPACA output lives in alpaca/output (structure TBC).
 

@@ -1,0 +1,103 @@
+name: wgs_tree_clones
+cohort: wgs   # TRACERx WGS cohort (see _sources.yml cohorts)
+description: |
+  Clones on each WGS tumour's phylogenetic tree as given to ALPACA
+  (`tree_paths.json`). One row per (tumour × clone on the tree), with the
+  clone's parent, depth and leaf/trunk flags.
+
+  Defines single-clone tumours: `n_clones_tree = 1` (Piotr, 2026-10-28:
+  count clones on the tree, not in cp_table).
+
+provenance:
+  cohort: TRACERx WGS
+  hpc_source: /nemo/project/proj-tracerx-lung/tctProjects/CN-CCF/wgs_resources/alpaca/input/<wgs_tumour_label>/tree_paths.json
+  format_on_source: JSON list of trunk → leaf paths (lists of clone IDs); one file per tumour
+  received: 2026-10-28
+  received_via: Piotr (Slack DM); format from the ALPACA-model README
+  canonical_format: Parquet (after build script)
+  pipeline: CONIPHER tree → ALPACA input conversion
+
+primary_key:
+  - tumour_id
+  - clone
+
+grain: one row per (WGS tumour × clone on the tree)
+
+joins:
+  wgs_clone_proportions:
+    on:
+      - "wgs_tree_clones.tumour_id = wgs_clone_proportions.tumour_id"
+      - "wgs_tree_clones.clone = wgs_clone_proportions.clone"
+  wgs_consensus_segments:
+    on:
+      - "wgs_tree_clones.tumour_id = wgs_consensus_segments.tumour_id"
+
+filters_of_interest:
+  single_clone_tumours: "SELECT DISTINCT tumour_id FROM wgs_tree_clones WHERE n_clones_tree = 1"
+
+columns:
+  - name: tumour_id
+    type: VARCHAR
+    description: "Canonical tumour ID (`LTX0001-Tumour1`), standardised from the folder's WGS tumour label."
+    null_semantics: not_applicable
+    derived: true
+
+  - name: patient_id
+    type: VARCHAR
+    description: "Patient ID (`LTX0001`)."
+    null_semantics: not_applicable
+    derived: true
+
+  - name: wgs_tumour_label
+    type: VARCHAR
+    description: "Folder name under alpaca/input (`LTX0001`, `LTX0002_tumour1`). For locating files only."
+    null_semantics: not_applicable
+    derived: true
+
+  - name: clone
+    type: VARCHAR
+    description: "Clone ID verbatim from tree_paths.json; matches `wgs_clone_proportions.clone`."
+    null_semantics: not_applicable
+
+  - name: is_trunk
+    type: BOOLEAN
+    description: "First clone of every path (the MRCA)."
+    null_semantics: not_applicable
+    derived: true
+
+  - name: is_leaf
+    type: BOOLEAN
+    description: "Last clone of some path. A single-clone tumour's only clone is both trunk and leaf."
+    null_semantics: not_applicable
+    derived: true
+
+  - name: depth
+    type: BIGINT
+    description: "Position on its path; trunk = 0."
+    null_semantics: not_applicable
+    derived: true
+
+  - name: parent_clone
+    type: VARCHAR
+    description: "Preceding clone on the path."
+    null_semantics: not_applicable
+    derived: true
+    notes: "NULL for the trunk."
+
+  - name: n_clones_tree
+    type: BIGINT
+    description: "Distinct clones on this tumour's tree (repeated on every row)."
+    null_semantics: not_applicable
+    derived: true
+
+relationships:
+  - column: tumour_id
+    references: wgs_battenberg_inventory.tumour_id
+
+scope_notes: |
+  The build fails on malformed files: paths that start at different
+  clones, or a clone with different parents on different paths. Newick
+  `tree_paths.nwk` (ALPACA's fallback) is not read.
+
+open_questions:
+  - "Is tree_paths.json present for every WGS tumour, including single-clone ones, or is a missing file itself a signal?"

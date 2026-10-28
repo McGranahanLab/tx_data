@@ -23,6 +23,11 @@
           "clone1": 1.0
         }
       },
+      "tree_paths": [
+        [
+          "clone1"
+        ]
+      ],
       "samples": [
         {
           "sample_name_hash": "LTX0001_SU_T1-R1--41466d3700",
@@ -50,6 +55,11 @@
           "clone1": 1.0
         }
       },
+      "tree_paths": [
+        [
+          "clone1"
+        ]
+      ],
       "samples": [
         {
           "sample_name_hash": "LTX0002_SU_T1-R1--2d7f68c56f",
@@ -77,6 +87,11 @@
           "clone1": 1.0
         }
       },
+      "tree_paths": [
+        [
+          "clone1"
+        ]
+      ],
       "samples": [
         {
           "sample_name_hash": "LTX0003_SU_T1-R1--a203689682",
@@ -106,6 +121,16 @@
           "clone3": 0.2953
         }
       },
+      "tree_paths": [
+        [
+          "clone1",
+          "clone2"
+        ],
+        [
+          "clone1",
+          "clone3"
+        ]
+      ],
       "samples": [
         {
           "sample_name_hash": "LTX0004_SU_T1-R1--b3ccabd941",
@@ -133,6 +158,11 @@
           "clone1": 1.0
         }
       },
+      "tree_paths": [
+        [
+          "clone1"
+        ]
+      ],
       "samples": [
         {
           "sample_name_hash": "LTX0101_SU_T1-R1--a961170f44",
@@ -160,6 +190,11 @@
           "clone1": 1.0
         }
       },
+      "tree_paths": [
+        [
+          "clone1"
+        ]
+      ],
       "samples": [
         {
           "sample_name_hash": "LTX0102_SU_T1-R1--87e2aaccca",
@@ -193,6 +228,12 @@
           "clone2": 0.5772
         }
       },
+      "tree_paths": [
+        [
+          "clone1",
+          "clone2"
+        ]
+      ],
       "samples": [
         {
           "sample_name_hash": "LTX0103_SU_T1-R1--0237ebf159",
@@ -227,6 +268,11 @@
           "clone1": 1.0
         }
       },
+      "tree_paths": [
+        [
+          "clone1"
+        ]
+      ],
       "samples": [
         {
           "sample_name_hash": "LTX0104_SU_T1-R1--84ad5706ab",
@@ -255,6 +301,12 @@
           "clone2": 0.3572
         }
       },
+      "tree_paths": [
+        [
+          "clone1",
+          "clone2"
+        ]
+      ],
       "samples": [
         {
           "sample_name_hash": "LTX0104_SU_T2-R1--043bc30a48",
@@ -282,6 +334,11 @@
           "clone1": 1.0
         }
       },
+      "tree_paths": [
+        [
+          "clone1"
+        ]
+      ],
       "samples": [
         {
           "sample_name_hash": "LTX0105_SU_T1-R1--b1895f54c4",
@@ -309,6 +366,11 @@
           "clone1": 1.0
         }
       },
+      "tree_paths": [
+        [
+          "clone1"
+        ]
+      ],
       "samples": [
         {
           "sample_name_hash": "LTX0106_SU_LN1--2ce9303a53",

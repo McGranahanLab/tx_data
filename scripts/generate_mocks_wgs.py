@@ -32,8 +32,10 @@ Copy-number model (consensus segments + ALPACA cp_table agree):
 
 Files written (mirrored /nemo paths under ``nemo_mock/``):
   - ``.../CN-CCF/wgs_resources/inventories/battenberg_output_inventory.tsv``
-  - ``.../CN-CCF/battenberg_wgs/output/<label>/tree_input/<label>_copynumber_consensus_segments_tree_input.tsv``
+  - ``.../CN-CCF/battenberg_wgs/output/<label>/tree_input/<label>_copynumber_MSAI_adjusted_consensus_segments_tree_input.tsv``
   - ``.../CN-CCF/wgs_resources/alpaca/input/<label>/cp_table.csv``
+  - ``.../CN-CCF/wgs_resources/alpaca/input/<label>/tree_paths.json`` (ALPACA
+    list-of-paths, trunk → leaf; every subclone is a child of clone1)
   - ``_cohort_manifest_wgs.json`` (mock-only metadata, not part of the mirror)
 
 Deterministic (fixed seed) so mocks re-generate identically.
@@ -303,7 +305,7 @@ def _write_cn(specs: list[WgsTumour], rows: list[dict]) -> dict[str, dict]:
                 major, minor = max(major, minor), min(major, minor)
                 lines.append(f"{src_name}\t{chrom}\t{start}\t{end}\t{major!r}\t{minor!r}")
         out = MOCK_BATTENBERG_OUT / label / "tree_input" / (
-            f"{label}_copynumber_consensus_segments_tree_input.tsv")
+            f"{label}_copynumber_MSAI_adjusted_consensus_segments_tree_input.tsv")
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text("\n".join(lines) + "\n")
 
@@ -316,13 +318,19 @@ def _write_cn(specs: list[WgsTumour], rows: list[dict]) -> dict[str, dict]:
         cp_out.parent.mkdir(parents=True, exist_ok=True)
         cp_out.write_text("\n".join(cp_lines) + "\n")
 
+        # tree_paths.json: ALPACA list of trunk → leaf paths.
+        subs = [c for c in states if c != "clone1"]
+        paths = [["clone1", c] for c in subs] or [["clone1"]]
+        (MOCK_ALPACA_INPUT / label / "tree_paths.json").write_text(json.dumps(paths) + "\n")
+
         truth[label] = {
             "n_segments": len(segs),
             "segments_header": "legacy_A_B" if legacy else "major_minor",
             "segments_sample_names": [_segments_source_name(n) for n in names],
             "clone_proportions": dict(zip(names, props)),
+            "tree_paths": paths,
         }
-    print(f"wrote consensus segments + cp_table for {len(truth)} tumours")
+    print(f"wrote MSAI-adjusted consensus segments + cp_table + tree_paths for {len(truth)} tumours")
     return truth
 
 

@@ -18,6 +18,7 @@ from tx_data.builds import (
     wgs_battenberg_inventory,
     wgs_clone_proportions,
     wgs_consensus_segments,
+    wgs_tree_clones,
 )
 
 __all__ = [
@@ -38,6 +39,7 @@ __all__ = [
     "wgs_battenberg_inventory",
     "wgs_consensus_segments",
     "wgs_clone_proportions",
+    "wgs_tree_clones",
 ]
 
 BUILDERS = {
@@ -58,4 +60,5 @@ BUILDERS = {
     "wgs_battenberg_inventory": wgs_battenberg_inventory.build,
     "wgs_consensus_segments": wgs_consensus_segments.build,
     "wgs_clone_proportions": wgs_clone_proportions.build,
+    "wgs_tree_clones": wgs_tree_clones.build,
 }

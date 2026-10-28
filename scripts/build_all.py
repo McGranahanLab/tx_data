@@ -44,6 +44,7 @@ TABLES = (
     "wgs_battenberg_inventory",
     "wgs_consensus_segments",
     "wgs_clone_proportions",
+    "wgs_tree_clones",
 )
 
 

@@ -5,7 +5,8 @@ description: |
   clone in each sample. Long form, one row per (tumour × clone × sample).
   WGS counterpart of `clone_proportions` (same source layout).
 
-  Used to tell single-clone tumours from multi-clone ones.
+  Not the single-clone definition: that counts clones on the tree
+  (`wgs_tree_clones`, Piotr 2026-10-28).
 
 provenance:
   cohort: TRACERx WGS
@@ -90,4 +91,4 @@ scope_notes: |
 
 open_questions:
   - "Are WGS cp_table sample headers full sample names like WES, or the short tree_input form? (Both are matched.)"
-  - "For single-clone calls: count clones in cp_table, or clones on the CONIPHER tree (tree_paths.json)? Can a cp_table list a clone at proportion 0?"
+  - "Can a cp_table list a clone at proportion 0?"
