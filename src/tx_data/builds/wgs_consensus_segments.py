@@ -5,6 +5,13 @@ consensus segments, read from each tumour's Battenberg `tree_input/` folder:
 
   battenberg_wgs/output/<label>/tree_input/<label>_copynumber_MSAI_adjusted_consensus_segments_tree_input.tsv
 
+Single-sample tumours can't be MSAI-adjusted; for them the final file is
+
+  battenberg_wgs/output/<label>/tree_input/<label>_copynumber_MSAI_NOT_adjusted_segments_tree_input.tsv
+
+(same columns), read when the adjusted file is absent. `msai_adjusted`
+records which file each row came from.
+
 Consensus segmentation: every sample of a tumour has the same breakpoints;
 the build logs any tumour where that doesn't hold.
 
@@ -47,10 +54,13 @@ SCHEMA = {
     "cn_major": pl.Float64,
     "cn_minor": pl.Float64,
     "cn_total": pl.Float64,
+    "msai_adjusted": pl.Boolean,
 }
 
+SINGLE_SAMPLE_PATTERN = "relative_path_pattern_single_sample"
 
-def _read_one(label: str, path) -> pl.DataFrame:
+
+def _read_one(label: str, path, msai_adjusted: bool) -> pl.DataFrame:
     df = pl.read_csv(
         path,
         separator="\t",
@@ -79,6 +89,7 @@ def _read_one(label: str, path) -> pl.DataFrame:
         pl.col("ENDPOS").cast(pl.Int64).alias("end"),
         pl.col(major_col).cast(pl.Float64).alias("cn_major"),
         pl.col(minor_col).cast(pl.Float64).alias("cn_minor"),
+        pl.lit(msai_adjusted).alias("msai_adjusted"),
     )
 
 
@@ -88,15 +99,23 @@ def build() -> pl.DataFrame:
 
     frames: list[pl.DataFrame] = []
     absent: list[str] = []
+    not_adjusted: list[str] = []
     for label in tumours.get_column("wgs_tumour_label").to_list():
-        path = resolve_source(TABLE, wgs_tumour_label=label)
-        if not path.is_file():
+        adjusted = resolve_source(TABLE, wgs_tumour_label=label)
+        single = resolve_source(TABLE, pattern_key=SINGLE_SAMPLE_PATTERN, wgs_tumour_label=label)
+        if adjusted.is_file():
+            if single.is_file():
+                log(f"note: {label} has both MSAI-adjusted and NOT_adjusted files; using adjusted")
+            frames.append(_read_one(label, adjusted, True))
+        elif single.is_file():
+            not_adjusted.append(label)
+            frames.append(_read_one(label, single, False))
+        else:
             absent.append(label)
-            continue
-        frames.append(_read_one(label, path))
-    log(f"read consensus segments for {len(frames)}/{tumours.height} WGS tumours")
+    log(f"read segments for {len(frames)}/{tumours.height} WGS tumours "
+        f"({len(frames) - len(not_adjusted)} MSAI-adjusted, {len(not_adjusted)} NOT_adjusted)")
     if absent:
-        log(f"warning: no consensus segments file for {len(absent)} tumour(s): {absent[:10]}")
+        log(f"warning: no segments file (adjusted or NOT_adjusted) for {len(absent)} tumour(s): {absent}")
 
     if not frames:
         df = pl.DataFrame(schema=SCHEMA)
@@ -125,6 +144,11 @@ def build() -> pl.DataFrame:
             .select(list(SCHEMA))
         )
 
+        multi_na = (df.filter(~pl.col("msai_adjusted")).group_by("tumour_id")
+                    .agg(pl.col("sample").n_unique().alias("n")).filter(pl.col("n") > 1))
+        if multi_na.height:
+            log(f"warning: NOT_adjusted file used for multi-sample tumour(s): "
+                f"{multi_na['tumour_id'].to_list()}")
         inverted = df.filter(pl.col("cn_major") < pl.col("cn_minor")).height
         if inverted:
             log(f"note: {inverted} row(s) with cn_major < cn_minor (kept as on source)")

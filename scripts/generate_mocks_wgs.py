@@ -33,6 +33,8 @@ Copy-number model (consensus segments + ALPACA cp_table agree):
 Files written (mirrored /nemo paths under ``nemo_mock/``):
   - ``.../CN-CCF/wgs_resources/inventories/battenberg_output_inventory.tsv``
   - ``.../CN-CCF/battenberg_wgs/output/<label>/tree_input/<label>_copynumber_MSAI_adjusted_consensus_segments_tree_input.tsv``
+    for multi-sample tumours; single-sample tumours can't be MSAI-adjusted and
+    get ``<label>_copynumber_MSAI_NOT_adjusted_segments_tree_input.tsv`` instead
   - ``.../CN-CCF/wgs_resources/alpaca/input/<label>/cp_table.csv``
   - ``.../CN-CCF/wgs_resources/alpaca/input/<label>/tree_paths.json`` (ALPACA
     list-of-paths, trunk → leaf; every subclone is a child of clone1)
@@ -304,8 +306,10 @@ def _write_cn(specs: list[WgsTumour], rows: list[dict]) -> dict[str, dict]:
                 # Major is the larger allele by definition, as on real files.
                 major, minor = max(major, minor), min(major, minor)
                 lines.append(f"{src_name}\t{chrom}\t{start}\t{end}\t{major!r}\t{minor!r}")
+        adjusted = len(samples) > 1
         out = MOCK_BATTENBERG_OUT / label / "tree_input" / (
-            f"{label}_copynumber_MSAI_adjusted_consensus_segments_tree_input.tsv")
+            f"{label}_copynumber_MSAI_adjusted_consensus_segments_tree_input.tsv" if adjusted
+            else f"{label}_copynumber_MSAI_NOT_adjusted_segments_tree_input.tsv")
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text("\n".join(lines) + "\n")
 
@@ -326,6 +330,7 @@ def _write_cn(specs: list[WgsTumour], rows: list[dict]) -> dict[str, dict]:
         truth[label] = {
             "n_segments": len(segs),
             "segments_header": "legacy_A_B" if legacy else "major_minor",
+            "msai_adjusted": adjusted,
             "segments_sample_names": [_segments_source_name(n) for n in names],
             "clone_proportions": dict(zip(names, props)),
             "tree_paths": paths,

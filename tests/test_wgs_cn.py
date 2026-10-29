@@ -129,3 +129,11 @@ def test_tree_paths_rejects_bad_files(tmp_path):
     f.write_text('[["clone1"]]')
     (row,) = _read_one("X", f)
     assert row["is_trunk"] and row["is_leaf"] and row["n_clones_tree"] == 1
+
+
+def test_single_sample_tumours_read_not_adjusted_file(built):
+    seg, m = built["seg"], built["manifest"]
+    got = dict(seg.select("tumour_id", "msai_adjusted").unique().rows())
+    for t in m["tumours"]:
+        assert got[t["tumour_id_canonical"]] is (len(t["samples"]) > 1) is t["msai_adjusted"]
+    assert not all(got.values()) and any(got.values())
