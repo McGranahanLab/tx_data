@@ -1,0 +1,346 @@
+{
+  "seed": 20261106,
+  "pgdd_commit": "cb0437b",
+  "tumours": [
+    {
+      "tumour_id": "LTX0001-Tumour1",
+      "note": "no WGD",
+      "samples": ["LTX0001_SU_T1-R1--747c1bf06732", "LTX0001_SU_T1-R2--3f45b4948fa6", "LTX0001_SU_T1-R3--b61225fc2dc5"],
+      "num_gds": [0, 0, 0],
+      "clusters": [
+        {
+          "cluster_id": "1",
+          "clonal": true,
+          "in_tree": true,
+          "n": 60
+        },
+        {
+          "cluster_id": "2",
+          "clonal": false,
+          "in_tree": true,
+          "n": 25
+        },
+        {
+          "cluster_id": "3",
+          "clonal": false,
+          "in_tree": true,
+          "n": 25
+        }
+      ]
+    },
+    {
+      "tumour_id": "LTX0002-Tumour1",
+      "note": "clonal WGD",
+      "samples": ["LTX0002_SU_T1-R1--1c7b8cd8024c", "LTX0002_SU_T1-R2--27b9394f3d44", "LTX0002_SU_T1-R3--e6f187c29c7f"],
+      "num_gds": [1, 1, 1],
+      "clusters": [
+        {
+          "cluster_id": "1",
+          "clonal": true,
+          "in_tree": true,
+          "n": 60
+        },
+        {
+          "cluster_id": "2",
+          "clonal": false,
+          "in_tree": true,
+          "n": 25
+        },
+        {
+          "cluster_id": "3",
+          "clonal": false,
+          "in_tree": true,
+          "n": 25
+        },
+        {
+          "cluster_id": "4",
+          "clonal": false,
+          "in_tree": true,
+          "n": 25
+        }
+      ]
+    },
+    {
+      "tumour_id": "LTX0003-Tumour1",
+      "note": "clonal WGD",
+      "samples": ["LTX0003_SU_T1-R1--303275f98e34", "LTX0003_SU_T1-R2--7c5f1cca2efe"],
+      "num_gds": [1, 1],
+      "clusters": [
+        {
+          "cluster_id": "1",
+          "clonal": true,
+          "in_tree": true,
+          "n": 60
+        },
+        {
+          "cluster_id": "2",
+          "clonal": false,
+          "in_tree": true,
+          "n": 25
+        },
+        {
+          "cluster_id": "3",
+          "clonal": false,
+          "in_tree": true,
+          "n": 25
+        }
+      ]
+    },
+    {
+      "tumour_id": "LTX0004-Tumour1",
+      "note": "single subclonal WGD (R1,R2,R4) supported by tree cluster 3; borderline cluster 5 in R4 (expected unstable)",
+      "samples": ["LTX0004_SU_T1-R1--5cff1a1bc423", "LTX0004_SU_T1-R2--84a076be1ba4", "LTX0004_SU_T1-R3--c332e3495e61", "LTX0004_SU_T1-R4--af47e1734e85"],
+      "num_gds": [1, 1, 0, 1],
+      "clusters": [
+        {
+          "cluster_id": "1",
+          "clonal": true,
+          "in_tree": true,
+          "n": 60
+        },
+        {
+          "cluster_id": "2",
+          "clonal": false,
+          "in_tree": true,
+          "n": 25
+        },
+        {
+          "cluster_id": "3",
+          "clonal": false,
+          "in_tree": true,
+          "n": 25
+        },
+        {
+          "cluster_id": "4",
+          "clonal": false,
+          "in_tree": true,
+          "n": 25
+        },
+        {
+          "cluster_id": "5",
+          "clonal": false,
+          "in_tree": true,
+          "n": 12
+        }
+      ]
+    },
+    {
+      "tumour_id": "LTX0005-Tumour1",
+      "note": "parallel subclonal WGDs: R1 supported by clusters 3 + 6 ('3,6'; 6 not in tree), R3+R4 by cluster 4",
+      "samples": ["LTX0005_SU_T1-R1--b9479e430b13", "LTX0005_SU_T1-R2--71df3dbaa31f", "LTX0005_SU_T1-R3--48ed74a59878", "LTX0005_SU_T1-R4--3b350ff3cd00"],
+      "num_gds": [1, 0, 1, 1],
+      "clusters": [
+        {
+          "cluster_id": "1",
+          "clonal": true,
+          "in_tree": true,
+          "n": 60
+        },
+        {
+          "cluster_id": "2",
+          "clonal": false,
+          "in_tree": true,
+          "n": 25
+        },
+        {
+          "cluster_id": "3",
+          "clonal": false,
+          "in_tree": true,
+          "n": 25
+        },
+        {
+          "cluster_id": "4",
+          "clonal": false,
+          "in_tree": true,
+          "n": 25
+        },
+        {
+          "cluster_id": "5",
+          "clonal": false,
+          "in_tree": true,
+          "n": 25
+        },
+        {
+          "cluster_id": "6",
+          "clonal": false,
+          "in_tree": false,
+          "n": 20
+        }
+      ]
+    },
+    {
+      "tumour_id": "LTX0006-Tumour1",
+      "note": "subclonal WGD (R1,R2) supported ONLY by cluster 7, which is not in the tree -> ploidy-only after pruning",
+      "samples": ["LTX0006_SU_T1-R1--284a1cb15db8", "LTX0006_SU_T1-R2--c635afdc3c81", "LTX0006_SU_T1-R3--9a4163461e6e"],
+      "num_gds": [1, 1, 0],
+      "clusters": [
+        {
+          "cluster_id": "1",
+          "clonal": true,
+          "in_tree": true,
+          "n": 60
+        },
+        {
+          "cluster_id": "2",
+          "clonal": false,
+          "in_tree": true,
+          "n": 25
+        },
+        {
+          "cluster_id": "3",
+          "clonal": false,
+          "in_tree": true,
+          "n": 25
+        },
+        {
+          "cluster_id": "4",
+          "clonal": false,
+          "in_tree": true,
+          "n": 25
+        },
+        {
+          "cluster_id": "7",
+          "clonal": false,
+          "in_tree": false,
+          "n": 22
+        }
+      ]
+    },
+    {
+      "tumour_id": "LTX0007-Tumour1",
+      "note": "parallel subclonal WGDs: R2 by cluster 2, R3 by cluster 12 (not in tree). Cluster ids 2/12 exercise PGDD's grepl substring match (R/parrallel_gd_caller.R:412)",
+      "samples": ["LTX0007_SU_T1-R1--c53a298e793b", "LTX0007_SU_T1-R2--d9716744d734", "LTX0007_SU_T1-R3--ada58a2735cb"],
+      "num_gds": [0, 1, 1],
+      "clusters": [
+        {
+          "cluster_id": "1",
+          "clonal": true,
+          "in_tree": true,
+          "n": 60
+        },
+        {
+          "cluster_id": "2",
+          "clonal": false,
+          "in_tree": true,
+          "n": 30
+        },
+        {
+          "cluster_id": "3",
+          "clonal": false,
+          "in_tree": true,
+          "n": 25
+        },
+        {
+          "cluster_id": "4",
+          "clonal": false,
+          "in_tree": true,
+          "n": 25
+        },
+        {
+          "cluster_id": "5",
+          "clonal": false,
+          "in_tree": true,
+          "n": 25
+        },
+        {
+          "cluster_id": "12",
+          "clonal": false,
+          "in_tree": false,
+          "n": 22
+        }
+      ]
+    },
+    {
+      "tumour_id": "LTX0008-Tumour1",
+      "note": "clonal WGD",
+      "samples": ["LTX0008_SU_T1-R1--c6734ebba79e", "LTX0008_SU_T1-R2--fcf7272f545a"],
+      "num_gds": [1, 1],
+      "clusters": [
+        {
+          "cluster_id": "1",
+          "clonal": true,
+          "in_tree": true,
+          "n": 60
+        },
+        {
+          "cluster_id": "2",
+          "clonal": false,
+          "in_tree": true,
+          "n": 25
+        },
+        {
+          "cluster_id": "3",
+          "clonal": false,
+          "in_tree": true,
+          "n": 25
+        }
+      ]
+    },
+    {
+      "tumour_id": "LTX0008-Tumour2",
+      "note": "no WGD",
+      "samples": ["LTX0008_SU_T2-R1--f4f8c52488df", "LTX0008_SU_T2-R2--1c6ede324253"],
+      "num_gds": [0, 0],
+      "clusters": [
+        {
+          "cluster_id": "1",
+          "clonal": true,
+          "in_tree": true,
+          "n": 60
+        },
+        {
+          "cluster_id": "2",
+          "clonal": false,
+          "in_tree": true,
+          "n": 25
+        }
+      ]
+    },
+    {
+      "tumour_id": "LTX0009-Tumour1",
+      "note": "subclonal WGD (R1, cluster 2); tumour has no CONIPHER tree (unresolved) -> drop",
+      "samples": ["LTX0009_SU_T1-R1--75e59ae47e34", "LTX0009_SU_T1-R2--b66e763724ea"],
+      "num_gds": [1, 0],
+      "clusters": [
+        {
+          "cluster_id": "1",
+          "clonal": true,
+          "in_tree": false,
+          "n": 60
+        },
+        {
+          "cluster_id": "2",
+          "clonal": false,
+          "in_tree": false,
+          "n": 30
+        }
+      ]
+    },
+    {
+      "tumour_id": "LTX0010-Tumour1",
+      "note": "clonal first WGD + subclonal second WGD in R1 (cluster 3); tumour has no CONIPHER tree -> drop",
+      "samples": ["LTX0010_SU_T1-R1--af9067a262a9", "LTX0010_SU_T1-R2--d650fafd76c3"],
+      "num_gds": [2, 1],
+      "clusters": [
+        {
+          "cluster_id": "1",
+          "clonal": true,
+          "in_tree": false,
+          "n": 60
+        },
+        {
+          "cluster_id": "2",
+          "clonal": false,
+          "in_tree": false,
+          "n": 25
+        },
+        {
+          "cluster_id": "3",
+          "clonal": false,
+          "in_tree": false,
+          "n": 25
+        }
+      ]
+    }
+  ]
+}
