@@ -22,15 +22,34 @@ Files written under ``MOCK_ROOT`` (WES release tree):
   - ``tx842_mutation_table.tsv.gz``  (long format, one row per mutation×sample)
   - ``WGD/release_tx842/WGD_calls.tsv``
   - ``tx842_clinical.tsv``
+  - ``ALPACA/input/<tumour>/cp_table.csv``, ``ALPACA/output/cohort_results/all_tumours_combined.csv``
+  - ``tx842_purity_ploidy.csv``, ``mapping_files/tx842_samplehash_tumour_lesion_map.tsv``
+  - ``primary_met/tx842_primary_met_cloneInfo.df.txt``
   - ``CN-CCF/alphamissense/output/annotated_muttables/tx842/<tumour_muttable_form>_muttable_alpha.tsv``
     (under ``tctProjects/``, outside the release tree)
 
 Deterministic (fixed seed) so mocks re-generate identically.
+
+Cross-source invariants (asserted in ``tests/test_mock_consistency.py``):
+
+  - Tree clones: for every resolved tumour the clones on the tree are
+    ``TumourSpec.clones``. ALPACA (cp_table + all_tumours_combined), the
+    CONIPHER RDS (``ccf_cluster_table`` / clonality rows) and
+    ``clone_info.treeClones == TRUE`` all use exactly that set. Clusters PGDD
+    sees that CONIPHER dropped are ``TumourSpec.non_tree_clusters``: they
+    appear in clone_info with ``treeClones == FALSE`` and in the RDS's
+    ``tree_removed_clusters``, and nowhere else.
+  - Sample hashes: one hash per DNA region (``_region_hash``), shared by the
+    muttable, cp_table, purity_ploidy, the CONIPHER RDS and the PGDD mock
+    (the R generators read it from ``_cohort_manifest.json``). Kallisto is
+    RNA-seq and keeps its own hashes: RNA and DNA libraries of the same
+    biopsy carry different hashes in the real release (catalog/kallisto.yml).
 """
 
 from __future__ import annotations
 
 import gzip
+import hashlib
 import io
 import random
 from dataclasses import dataclass, field
@@ -121,6 +140,9 @@ class TumourSpec:
     quality: str
     n_samples: int
     clones: list[Clone]
+    # Mutation clusters PGDD sees that CONIPHER dropped from the tree
+    # (cluster ids, numbered after the tree clones). Resolved tumours only.
+    non_tree_clusters: list[int] = field(default_factory=list)
     total_gds: int = field(init=False)
 
     def __post_init__(self) -> None:
@@ -133,6 +155,27 @@ class TumourSpec:
     @property
     def tumour_id_canonical(self) -> str:
         return f"{self.patient_id}-Tumour{self.tumour_ordinal}"
+
+    @property
+    def has_tree(self) -> bool:
+        # CONIPHER / ALPACA are only run on resolved tumours.
+        return self.status == "resolved"
+
+
+def _region_hash(spec: TumourSpec, region: int) -> str:
+    """The one hash for a DNA region, shared by every WES mock source.
+
+    Derived from the tumour + region (not the shared RNG) so it doesn't
+    depend on emitter order and the R generators can read it back from the
+    cohort manifest.
+    """
+    key = f"{spec.tumour_id_canonical}|R{region}".encode()
+    return hashlib.blake2s(key, digest_size=6).hexdigest()
+
+
+def _region_sample_name(spec: TumourSpec, region: int) -> str:
+    """`<patient>_SU_T<n>-R<r>--<hash>` (muttable / purity_ploidy / cp_table form)."""
+    return f"{spec.patient_id}_SU_T{spec.tumour_ordinal}-R{region}--{_region_hash(spec, region)}"
 
 
 def _linear_tree(n_clones: int) -> list[Clone]:
@@ -190,20 +233,23 @@ def cohort() -> list[TumourSpec]:
     tree[3].gds_at_clone = 1  # clone4
     tree[4].gds_at_clone = 1  # clone5 — independent branch
     specs.append(TumourSpec("LTX0005", 1, "LUAD", "mut_supported",
-                            "parallel only", "resolved", "High", 4, tree))
+                            "parallel only", "resolved", "High", 4, tree,
+                            non_tree_clusters=[6]))
 
     # 6. Sequential subclonal WGDs (mut_supported, sequential only).
     tree = _linear_tree(4)
     tree[1].gds_at_clone = 1  # clone2
     tree[2].gds_at_clone = 1  # clone3 — sequential on the same path
     specs.append(TumourSpec("LTX0006", 1, "LUAD", "mut_supported",
-                            "sequential only", "resolved", "High", 3, tree))
+                            "sequential only", "resolved", "High", 3, tree,
+                            non_tree_clusters=[7]))
 
     # 7. ploidy_only subclonal WGD (weaker call).
     tree = _branching_tree()
     tree[3].gds_at_clone = 1
     specs.append(TumourSpec("LTX0007", 1, "LUAD", "ploidy_only",
-                            "single subclonal GD", "resolved", "Low", 3, tree))
+                            "single subclonal GD", "resolved", "Low", 3, tree,
+                            non_tree_clusters=[12]))
 
     # 8. Multi-tumour patient: Tumour1 is clonal_wgd, Tumour2 is no_wgd.
     tree = _linear_tree(3)
@@ -325,7 +371,7 @@ def _write_muttable(specs: list[TumourSpec]) -> None:
         muts = _mutations_for(spec)
         sample_ids = []
         for i in range(spec.n_samples):
-            s = f"{spec.patient_id}_SU_T{spec.tumour_ordinal}-R{i + 1}--{RNG.randbytes(6).hex()}"
+            s = _region_sample_name(spec, i + 1)
             sample_ids.append(s)
             _record_tumour_sample(s, spec, lesion_ordinal=i + 1)
         gl = f"{spec.patient_id}_BS_GL--{RNG.randbytes(6).hex()}"
@@ -917,14 +963,8 @@ def _write_clone_proportions(specs: list[TumourSpec]) -> None:
         tumour_dir = CLONE_PROP_ROOT / spec.tumour_id_canonical
         tumour_dir.mkdir(parents=True, exist_ok=True)
 
-        # Sample IDs mirror the kallisto naming convention (`SU_T{n}-R{r}--<hash>`)
-        # so the two mocks share a plausible cross-table shape.
-        sample_ids: list[str] = []
-        for r in range(1, spec.n_samples + 1):
-            h = RNG.randbytes(6).hex()
-            s = f"{spec.patient_id}_SU_T{spec.tumour_ordinal}-R{r}--{h}"
-            sample_ids.append(s)
-            _record_tumour_sample(s, spec, lesion_ordinal=r)
+        # Same per-region sample names as the muttable.
+        sample_ids = [_region_sample_name(spec, r) for r in range(1, spec.n_samples + 1)]
 
         clone_names = [c.name for c in spec.clones]
         # proportions[sample_idx][clone_idx] → float
@@ -962,12 +1002,8 @@ def _write_clone_proportions(specs: list[TumourSpec]) -> None:
 def _write_purity_ploidy(specs: list[TumourSpec]) -> None:
     """Emit `<MOCK_ROOT>/tx842_purity_ploidy.csv`.
 
-    One row per sequencing region for every resolved tumour. Uses the same
-    `_SU_T{n}-R{r}--<hash>` convention as muttable / kallisto / clone_proportions.
-    Hashes are drawn from the shared RNG, so they will NOT line up with the
-    equivalent muttable rows — that's a mock limitation, not a convention
-    violation. Downstream joins at mock level use (tumour_id, region) via the
-    build script's derived columns, which do line up.
+    One row per sequencing region for every resolved tumour, with the same
+    per-region sample names as the muttable and cp_table.
     """
     out = MOCK_ROOT / "tx842_purity_ploidy.csv"
     lines = ['"sample_name_hash","purity","ploidy"']
@@ -975,9 +1011,7 @@ def _write_purity_ploidy(specs: list[TumourSpec]) -> None:
         if spec.status != "resolved":
             continue
         for r in range(1, spec.n_samples + 1):
-            h = RNG.randbytes(6).hex()
-            sample_hash = f"{spec.patient_id}_SU_T{spec.tumour_ordinal}-R{r}--{h}"
-            _record_tumour_sample(sample_hash, spec, lesion_ordinal=r)
+            sample_hash = _region_sample_name(spec, r)
             # Plausible mock values: purity ~ U(0.2, 0.95); ploidy ~ 2.0 for
             # no_wgd, ~4.0 for clonal_wgd, otherwise ~3.5. Add a touch of noise.
             if spec.class_ == "clonal_wgd":
@@ -996,9 +1030,9 @@ def _write_sample_hash_map() -> None:
     """Emit `<MOCK_ROOT>/mapping_files/tx842_samplehash_tumour_lesion_map.tsv`.
 
     Draws from `_HASH_LEDGER`, which collects every tumour-sample hash minted
-    across the other mock emitters so the mapping is consistent with every
-    other table (each table generates its own hash set, but all of them land
-    in the ledger alongside their patient / tumour / lesion metadata).
+    across the other mock emitters: one DNA hash per region (shared by
+    muttable, purity_ploidy, cp_table, CONIPHER, PGDD) plus the kallisto RNA
+    hashes.
     """
     SAMPLE_MAP_DIR.mkdir(parents=True, exist_ok=True)
     out = SAMPLE_MAP_DIR / "tx842_samplehash_tumour_lesion_map.tsv"
@@ -1015,6 +1049,59 @@ def _write_sample_hash_map() -> None:
     print(f"wrote {out} ({len(lines) - 1} sample hashes)")
 
 
+# --- clone_info (primary_met cloneInfo.df) ----------------------------------
+#
+# Clone sets come from the cohort spec (tree clones + non-tree clusters); only
+# the primary/met annotation is hand-picked here. Per tumour: clones seeding a
+# met (also shared between primary and met), clones seen in a met, and tree
+# clones NOT seen in the primary. Tumours absent from this dict are
+# primary-only. Non-tree clusters get FALSE for every flag.
+_PRIMARY_MET = {
+    "LTX0002-Tumour1": dict(seeding={"clone1", "clone3"}, met={"clone1", "clone2", "clone3"},
+                            not_primary={"clone2"}),
+    "LTX0004-Tumour1": dict(seeding={"clone1", "clone3"}, met={"clone1", "clone2", "clone3"},
+                            not_primary={"clone2", "clone3"}),
+    "LTX0007-Tumour1": dict(seeding={"clone1"}, met={"clone1", "clone2", "clone3"},
+                            not_primary={"clone3"}),
+}
+
+
+def _write_clone_info(specs: list[TumourSpec]) -> None:
+    """Emit `<MOCK_ROOT>/primary_met/tx842_primary_met_cloneInfo.df.txt`.
+
+    One row per tree clone (`treeClones` TRUE) and per non-tree cluster
+    (`treeClones` FALSE) of every resolved tumour; tumour ids in the
+    release's `LTX0001_1` spelling.
+    """
+    out = MOCK_ROOT / "primary_met" / "tx842_primary_met_cloneInfo.df.txt"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    header = ["tumour_id", "mutation_cluster", "treeClones", "seedingClones",
+              "clonalClones", "sharedClones", "primaryClones", "metClones"]
+    tf = {True: "TRUE", False: "FALSE"}
+    lines = ["\t".join(header)]
+    for spec in specs:
+        if not spec.has_tree:
+            continue
+        pm = _PRIMARY_MET.get(spec.tumour_id_canonical, {})
+        unknown = set().union(*pm.values()) - {c.name for c in spec.clones} if pm else set()
+        assert not unknown, f"{spec.tumour_id_canonical}: _PRIMARY_MET names non-tree clones {unknown}"
+        tid = f"{spec.patient_id}_{spec.tumour_ordinal}"
+        for c in spec.clones:
+            seeding = c.name in pm.get("seeding", set())
+            lines.append("\t".join([
+                tid, c.name.removeprefix("clone"), "TRUE",
+                tf[seeding],
+                tf[c.parent == "diploid"],
+                tf[seeding],
+                tf[c.name not in pm.get("not_primary", set())],
+                tf[c.name in pm.get("met", set())],
+            ]))
+        for k in spec.non_tree_clusters:
+            lines.append("\t".join([tid, str(k), "FALSE"] + ["FALSE"] * 5))
+    out.write_text("\n".join(lines) + "\n")
+    print(f"wrote {out} ({len(lines) - 1} rows)")
+
+
 def _write_cohort_manifest(specs: list[TumourSpec]) -> None:
     """Emit `nemo_mock/_cohort_manifest.json` for cross-language mock gens.
 
@@ -1027,7 +1114,7 @@ def _write_cohort_manifest(specs: list[TumourSpec]) -> None:
     import json
 
     manifest = {
-        "schema_version": 1,
+        "schema_version": 2,
         "cohort": "wes",
         "cohort_tag": "Tx842_mock",
         "random_seed": 20260831,
@@ -1040,10 +1127,18 @@ def _write_cohort_manifest(specs: list[TumourSpec]) -> None:
                 "status": spec.status,
                 "histology_group": spec.histology_group,
                 "n_samples": spec.n_samples,
+                # DNA region sample names: the one hash per region every
+                # WES mock source uses (R generators read them from here).
+                "samples": [
+                    {"region": f"R{r}", "sample_name_hash": _region_sample_name(spec, r)}
+                    for r in range(1, spec.n_samples + 1)
+                ],
+                "has_tree": spec.has_tree,
                 "clones": [
                     {"name": c.name, "parent": c.parent, "gds_at_clone": c.gds_at_clone}
                     for c in spec.clones
                 ],
+                "non_tree_clusters": spec.non_tree_clusters,
             }
             for spec in specs
         ],
@@ -1068,13 +1163,15 @@ def main() -> None:
     _write_kallisto(specs)
     _write_clone_proportions(specs)
     _write_purity_ploidy(specs)
+    _write_clone_info(specs)
     _write_sample_hash_map()
     _write_cohort_manifest(specs)
     print("done.")
     print(
-        "note: `conipher_trees` mock (`<MOCK_ROOT>/tx842_trees.RDS`) is produced by\n"
-        "      `Rscript scripts/generate_mock_conipher_trees.R` — requires an R env\n"
-        "      with the `jsonlite` package (e.g. the tx800_alpaca_replica pixi env)."
+        "note: `conipher_trees` mock (`<MOCK_ROOT>/tx842_trees.RDS`) and the PGDD mock are\n"
+        "      produced by `Rscript scripts/generate_mock_conipher_trees.R` and\n"
+        "      `Rscript scripts/generate_mock_pgdd.R` — re-run both after this script;\n"
+        "      they read sample hashes and clone sets from `_cohort_manifest.json`."
     )
 
 

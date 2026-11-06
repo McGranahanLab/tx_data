@@ -18,7 +18,7 @@
 # on clusters that CONIPHER later drops from the tree. The scenarios include
 # such clusters (`in_tree = FALSE`) so downstream pruning can be tested.
 #
-# Requires: R + data.table, and a checkout of amf71/ParallelGDDetect
+# Requires: R + data.table + jsonlite, and a checkout of amf71/ParallelGDDetect
 # (set PGDD_SRC, default ~/scratch/PGDD_amf71). Tested at master cb0437b.
 #
 # Run:
@@ -53,11 +53,24 @@ dir.create(syn_dir, recursive = TRUE, showWarnings = FALSE)
 SEED <- 20261106L
 set.seed(SEED)
 
-# ---- sample ids: taken from the mock muttable so PGDD output joins back to it ----
-mt <- fread(cmd = paste("zcat", shQuote(file.path(wes_root, "tx842_mutation_table.tsv.gz"))),
-            select = c("patient_tumour", "sample_name_hash"))
-mt <- unique(mt)[order(patient_tumour, sample_name_hash)]
-samples_by_tumour <- split(mt$sample_name_hash, mt$patient_tumour)
+# ---- sample ids + tree clones: from the cohort manifest (generate_mocks.py) ----
+# Same per-region hash as the muttable / purity_ploidy / cp_table / CONIPHER RDS,
+# in region order (R1, R2, ...), so `gds` below lines up with the region.
+manifest <- jsonlite::fromJSON(file.path(repo_root, "nemo_mock", "_cohort_manifest.json"),
+                               simplifyVector = FALSE)
+if (!identical(as.integer(manifest$schema_version), 2L)) {
+  stop("cohort manifest schema_version must be 2; re-run `python scripts/generate_mocks.py`.")
+}
+manifest_tumours <- setNames(manifest$tumours,
+                             vapply(manifest$tumours, function(t) t$tumour_id_muttable, ""))
+samples_by_tumour <- lapply(manifest_tumours, function(t)
+  vapply(t$samples, function(s) s$sample_name_hash, ""))
+# Cross-check against the muttable the manifest was written alongside.
+mt <- unique(fread(cmd = paste("zcat", shQuote(file.path(wes_root, "tx842_mutation_table.tsv.gz"))),
+                   select = c("patient_tumour", "sample_name_hash")))
+for (t in names(samples_by_tumour)) {
+  stopifnot(setequal(samples_by_tumour[[t]], mt[patient_tumour == t, sample_name_hash]))
+}
 
 # ---- scenarios ----
 # gds: num_gds per sample, in region order (R1, R2, ...). Consistent with mock
@@ -150,6 +163,26 @@ scenarios <- list(
 )
 
 stopifnot(setequal(names(scenarios), names(samples_by_tumour)))
+
+# Scenario clusters must match the tree: in_tree clusters are exactly the
+# manifest tree clones (= ALPACA / CONIPHER / clone_info), in_tree = FALSE are
+# the manifest non_tree_clusters (or everything, for tumours with no tree).
+for (tumour in names(scenarios)) {
+  mt_t <- manifest_tumours[[tumour]]
+  ids <- vapply(scenarios[[tumour]]$clusters, function(c) c$id, "")
+  in_tree <- vapply(scenarios[[tumour]]$clusters, function(c) c$in_tree, TRUE)
+  if (isTRUE(mt_t$has_tree)) {
+    tree <- sub("^clone", "", vapply(mt_t$clones, function(c) c$name, ""))
+    off <- as.character(unlist(mt_t$non_tree_clusters))
+  } else {
+    tree <- character(0)
+    off <- ids
+  }
+  if (!setequal(ids[in_tree], tree) || !setequal(ids[!in_tree], off)) {
+    stop(sprintf("%s: scenario clusters (tree: %s; off: %s) disagree with manifest (tree: %s; off: %s)",
+                 tumour, toString(ids[in_tree]), toString(ids[!in_tree]), toString(tree), toString(off)))
+  }
+}
 
 # Scenario keys follow the muttable form (LTX0001_tumour1, used to look up samples);
 # PGDD is run on the canonical form used by the lab's PGDD runs (LTX0001-Tumour1).

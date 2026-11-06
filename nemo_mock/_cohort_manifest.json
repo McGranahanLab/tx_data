@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "cohort": "wes",
   "cohort_tag": "Tx842_mock",
   "random_seed": 20260831,
@@ -12,6 +12,21 @@
       "status": "resolved",
       "histology_group": "LUAD",
       "n_samples": 3,
+      "samples": [
+        {
+          "region": "R1",
+          "sample_name_hash": "LTX0001_SU_T1-R1--ea44c3a1e787"
+        },
+        {
+          "region": "R2",
+          "sample_name_hash": "LTX0001_SU_T1-R2--c9a1651821ed"
+        },
+        {
+          "region": "R3",
+          "sample_name_hash": "LTX0001_SU_T1-R3--9460ed68adeb"
+        }
+      ],
+      "has_tree": true,
       "clones": [
         {
           "name": "clone1",
@@ -28,7 +43,8 @@
           "parent": "clone2",
           "gds_at_clone": 0
         }
-      ]
+      ],
+      "non_tree_clusters": []
     },
     {
       "patient_id": "LTX0002",
@@ -38,6 +54,21 @@
       "status": "resolved",
       "histology_group": "LUAD",
       "n_samples": 3,
+      "samples": [
+        {
+          "region": "R1",
+          "sample_name_hash": "LTX0002_SU_T1-R1--5c253c493302"
+        },
+        {
+          "region": "R2",
+          "sample_name_hash": "LTX0002_SU_T1-R2--d8ecce2a894b"
+        },
+        {
+          "region": "R3",
+          "sample_name_hash": "LTX0002_SU_T1-R3--a956ba41eb23"
+        }
+      ],
+      "has_tree": true,
       "clones": [
         {
           "name": "clone1",
@@ -59,7 +90,8 @@
           "parent": "clone3",
           "gds_at_clone": 0
         }
-      ]
+      ],
+      "non_tree_clusters": []
     },
     {
       "patient_id": "LTX0003",
@@ -69,6 +101,17 @@
       "status": "resolved",
       "histology_group": "LUSC",
       "n_samples": 2,
+      "samples": [
+        {
+          "region": "R1",
+          "sample_name_hash": "LTX0003_SU_T1-R1--7821675940b4"
+        },
+        {
+          "region": "R2",
+          "sample_name_hash": "LTX0003_SU_T1-R2--bf77200686cc"
+        }
+      ],
+      "has_tree": true,
       "clones": [
         {
           "name": "clone1",
@@ -85,7 +128,8 @@
           "parent": "clone2",
           "gds_at_clone": 0
         }
-      ]
+      ],
+      "non_tree_clusters": []
     },
     {
       "patient_id": "LTX0004",
@@ -95,6 +139,25 @@
       "status": "resolved",
       "histology_group": "LUAD",
       "n_samples": 4,
+      "samples": [
+        {
+          "region": "R1",
+          "sample_name_hash": "LTX0004_SU_T1-R1--d8379f4a7b66"
+        },
+        {
+          "region": "R2",
+          "sample_name_hash": "LTX0004_SU_T1-R2--398eaf989fbb"
+        },
+        {
+          "region": "R3",
+          "sample_name_hash": "LTX0004_SU_T1-R3--25a684de56ab"
+        },
+        {
+          "region": "R4",
+          "sample_name_hash": "LTX0004_SU_T1-R4--b3e2ffd030b1"
+        }
+      ],
+      "has_tree": true,
       "clones": [
         {
           "name": "clone1",
@@ -121,7 +184,8 @@
           "parent": "clone3",
           "gds_at_clone": 0
         }
-      ]
+      ],
+      "non_tree_clusters": []
     },
     {
       "patient_id": "LTX0005",
@@ -131,6 +195,25 @@
       "status": "resolved",
       "histology_group": "LUAD",
       "n_samples": 4,
+      "samples": [
+        {
+          "region": "R1",
+          "sample_name_hash": "LTX0005_SU_T1-R1--5dd8069469e4"
+        },
+        {
+          "region": "R2",
+          "sample_name_hash": "LTX0005_SU_T1-R2--0c68d99ef16e"
+        },
+        {
+          "region": "R3",
+          "sample_name_hash": "LTX0005_SU_T1-R3--24e263ce5ad1"
+        },
+        {
+          "region": "R4",
+          "sample_name_hash": "LTX0005_SU_T1-R4--e4b1d2148241"
+        }
+      ],
+      "has_tree": true,
       "clones": [
         {
           "name": "clone1",
@@ -157,6 +240,9 @@
           "parent": "clone3",
           "gds_at_clone": 1
         }
+      ],
+      "non_tree_clusters": [
+        6
       ]
     },
     {
@@ -167,6 +253,21 @@
       "status": "resolved",
       "histology_group": "LUAD",
       "n_samples": 3,
+      "samples": [
+        {
+          "region": "R1",
+          "sample_name_hash": "LTX0006_SU_T1-R1--e0281ca94079"
+        },
+        {
+          "region": "R2",
+          "sample_name_hash": "LTX0006_SU_T1-R2--98044f988ea9"
+        },
+        {
+          "region": "R3",
+          "sample_name_hash": "LTX0006_SU_T1-R3--38592367be25"
+        }
+      ],
+      "has_tree": true,
       "clones": [
         {
           "name": "clone1",
@@ -188,6 +289,9 @@
           "parent": "clone3",
           "gds_at_clone": 0
         }
+      ],
+      "non_tree_clusters": [
+        7
       ]
     },
     {
@@ -198,6 +302,21 @@
       "status": "resolved",
       "histology_group": "LUAD",
       "n_samples": 3,
+      "samples": [
+        {
+          "region": "R1",
+          "sample_name_hash": "LTX0007_SU_T1-R1--61fc7c8556f7"
+        },
+        {
+          "region": "R2",
+          "sample_name_hash": "LTX0007_SU_T1-R2--6d8d5221fbd1"
+        },
+        {
+          "region": "R3",
+          "sample_name_hash": "LTX0007_SU_T1-R3--e24f4f000468"
+        }
+      ],
+      "has_tree": true,
       "clones": [
         {
           "name": "clone1",
@@ -224,6 +343,9 @@
           "parent": "clone3",
           "gds_at_clone": 0
         }
+      ],
+      "non_tree_clusters": [
+        12
       ]
     },
     {
@@ -234,6 +356,17 @@
       "status": "resolved",
       "histology_group": "LUAD",
       "n_samples": 2,
+      "samples": [
+        {
+          "region": "R1",
+          "sample_name_hash": "LTX0008_SU_T1-R1--cf13bc9fa4cd"
+        },
+        {
+          "region": "R2",
+          "sample_name_hash": "LTX0008_SU_T1-R2--56009ebfd2bb"
+        }
+      ],
+      "has_tree": true,
       "clones": [
         {
           "name": "clone1",
@@ -250,7 +383,8 @@
           "parent": "clone2",
           "gds_at_clone": 0
         }
-      ]
+      ],
+      "non_tree_clusters": []
     },
     {
       "patient_id": "LTX0008",
@@ -260,6 +394,17 @@
       "status": "resolved",
       "histology_group": "LUSC",
       "n_samples": 2,
+      "samples": [
+        {
+          "region": "R1",
+          "sample_name_hash": "LTX0008_SU_T2-R1--9d06f892d638"
+        },
+        {
+          "region": "R2",
+          "sample_name_hash": "LTX0008_SU_T2-R2--458d5233d842"
+        }
+      ],
+      "has_tree": true,
       "clones": [
         {
           "name": "clone1",
@@ -271,7 +416,8 @@
           "parent": "clone1",
           "gds_at_clone": 0
         }
-      ]
+      ],
+      "non_tree_clusters": []
     },
     {
       "patient_id": "LTX0009",
@@ -281,6 +427,17 @@
       "status": "unresolved",
       "histology_group": "other",
       "n_samples": 2,
+      "samples": [
+        {
+          "region": "R1",
+          "sample_name_hash": "LTX0009_SU_T1-R1--33864ac7bd1a"
+        },
+        {
+          "region": "R2",
+          "sample_name_hash": "LTX0009_SU_T1-R2--c872183554cd"
+        }
+      ],
+      "has_tree": false,
       "clones": [
         {
           "name": "clone1",
@@ -292,7 +449,8 @@
           "parent": "clone1",
           "gds_at_clone": 0
         }
-      ]
+      ],
+      "non_tree_clusters": []
     },
     {
       "patient_id": "LTX0010",
@@ -302,6 +460,17 @@
       "status": "needs_follow_up",
       "histology_group": "LUAD",
       "n_samples": 2,
+      "samples": [
+        {
+          "region": "R1",
+          "sample_name_hash": "LTX0010_SU_T1-R1--f294295486e6"
+        },
+        {
+          "region": "R2",
+          "sample_name_hash": "LTX0010_SU_T1-R2--964d8c49fd73"
+        }
+      ],
+      "has_tree": false,
       "clones": [
         {
           "name": "clone1",
@@ -318,7 +487,8 @@
           "parent": "clone2",
           "gds_at_clone": 0
         }
-      ]
+      ],
+      "non_tree_clusters": []
     }
   ]
 }
