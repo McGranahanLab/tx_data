@@ -1,0 +1,12 @@
+tumour_id	First_GD	Second_GD	num_first_gd	num_second_gd	First_GD_homogen	Second_GD_homogen	GD_status_homogen	GD_statuses	frac_0_gd_regions	frac_1_gd_regions	frac_2_gd_regions	num_clonal_gds	num_subclonal_gds
+LTX0001_tumour1	No GD	No GD	0	0	TRUE	TRUE	TRUE	0	1	0	0	0	0
+LTX0002_tumour1	Clonal	No GD	1	0	TRUE	TRUE	TRUE	1	0	1	0	1	0
+LTX0003_tumour1	Clonal	No GD	1	0	TRUE	TRUE	TRUE	1	0	1	0	1	0
+LTX0004_tumour1	Subclonal	No GD	1	0	FALSE	TRUE	FALSE	0,1	0.25	0.75	0	0	1
+LTX0005_tumour1	Subclonal	No GD	2	0	FALSE	TRUE	FALSE	0,1	0.25	0.75	0	0	2
+LTX0006_tumour1	Subclonal	No GD	1	0	FALSE	TRUE	FALSE	0,1	0.333333333333333	0.666666666666667	0	0	1
+LTX0007_tumour1	Subclonal	No GD	1	0	FALSE	TRUE	FALSE	0,1	0.333333333333333	0.666666666666667	0	0	1
+LTX0008_tumour1	Clonal	No GD	1	0	TRUE	TRUE	TRUE	1	0	1	0	1	0
+LTX0008_tumour2	No GD	No GD	0	0	TRUE	TRUE	TRUE	0	1	0	0	0	0
+LTX0009_tumour1	Subclonal	No GD	1	0	FALSE	TRUE	FALSE	0,1	0.5	0.5	0	0	1
+LTX0010_tumour1	Clonal	Subclonal	1	1	TRUE	FALSE	FALSE	1,2	0	0.5	0.5	1	1

@@ -71,7 +71,23 @@ canonical store + synthetic `nemo_mock/` for local dev. Downstream projects
 | Build: alphamissense | ✅ | `src/tx_data/builds/alphamissense.py` |
 | Build: clinical | ✅ | `src/tx_data/builds/clinical.py` |
 | Mock generator | ✅ | `scripts/generate_mocks.py` |
+| Mock: PGDD outputs (WGD project) | ✅ mock only, no catalog/build yet | `scripts/generate_mock_pgdd.R`, `synthetic/pgdd/`, `nemo_mock/.../WGD/release_tx842/pgdd/` |
 | Tests | ✅ | `tests/test_pipeline.py` (6 passing) |
+
+### PGDD / WGD notes (2026-11-06)
+
+- `wgd_calls` (`WGD_calls.tsv`) is a **made-up placeholder**. The WGD project
+  will rebuild the integrated table from PGDD outputs + ALPACA.
+- Real PGDD output: `/nemo/project/proj-tracerx-lung/tctProjects/lungTx/Tx842/release/tracerx_842/WGD/release_tx842/pgdd`.
+  This is an **old run**. It will be regenerated with the new hg19 ALPACA
+  results, then again once hg38 is available.
+- Mock = the real `detect_par_gd()` (amf71/ParallelGDDetect `cb0437b`, bootstrap on)
+  run on synthetic input. Needs R + data.table + jsonlite and `PGDD_SRC`.
+  Scenario truth: `synthetic/pgdd/pgdd_mock_scenarios.json`.
+- Mock deliberately includes WGD calls on clusters absent from the CONIPHER
+  tree, multi-cluster events (`clusters = "3,6"`), and tumours with no tree.
+- LTX0007 reproduces PGDD's `grepl` substring issue: parallel GDs on
+  clusters 2 (R2) and 12 (R3) are merged into one event with `clusters = "2"`.
 
 ## How to run (pixi)
 
