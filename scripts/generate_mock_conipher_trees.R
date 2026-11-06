@@ -15,9 +15,12 @@
 #
 # This script reads `nemo_mock/_cohort_manifest.json` (produced by
 # `generate_mocks.py`) so the mock cohort shape stays in lockstep with the
-# other mock tables. Only `resolved` tumours are written; unresolved and
-# needs_follow_up tumours are skipped (CONIPHER would not have produced an
-# output for them in practice).
+# other mock tables: tree clones (ccf_cluster_table / clonality rows) are the
+# manifest `clones` (= ALPACA's clones), `tree_removed_clusters` are the
+# manifest `non_tree_clusters`, and region columns use the manifest sample
+# hashes (same hash as the muttable, R-style `.`/`..` separators). Only
+# tumours with `has_tree` are written; unresolved and needs_follow_up tumours
+# are skipped (CONIPHER would not have produced an output for them in practice).
 #
 # Run:
 #   Rscript scripts/generate_mock_conipher_trees.R
@@ -54,19 +57,18 @@ if (!file.exists(manifest_path)) {
 }
 
 manifest <- fromJSON(manifest_path, simplifyVector = FALSE)
+if (!identical(as.integer(manifest$schema_version), 2L)) {
+  stop("cohort manifest schema_version must be 2 (per-region samples + non_tree_clusters); ",
+       "re-run `python scripts/generate_mocks.py`.")
+}
 set.seed(manifest$random_seed)
 
 # ---- helpers ----------------------------------------------------------------
 
-rand_hash <- function(nchar = 12) {
-  paste0(sample(c(0:9, letters[1:6]), nchar, replace = TRUE), collapse = "")
-}
-
-region_colnames <- function(patient_id, tumour_ordinal, n_samples) {
-  # Mirrors the real convention: "<patient>_SU_T<n>.R<r>..<hash>"
-  sapply(seq_len(n_samples), function(r) {
-    sprintf("%s_SU_T%d.R%d..%s", patient_id, tumour_ordinal, r, rand_hash())
-  })
+region_colnames <- function(samples) {
+  # Real CONIPHER convention: "<patient>_SU_T<n>.R<r>..<hash>", i.e. the
+  # muttable name with `-` -> `.` and `--` -> `..` (make.names). Same hash.
+  vapply(samples, function(s) gsub("-", ".", s$sample_name_hash, fixed = TRUE), "")
 }
 
 clonality_from_ccf <- function(ccf_val) {
@@ -121,9 +123,13 @@ build_bundle <- function(spec) {
   t_ord   <- spec$tumour_ordinal
   n_s     <- spec$n_samples
   n_c     <- length(spec$clones)
+  stopifnot(length(spec$samples) == n_s)
 
-  sample_cols <- region_colnames(patient, t_ord, n_s)
-  clone_rows  <- as.character(seq_len(n_c))
+  sample_cols <- region_colnames(spec$samples)
+  clone_rows  <- sub("^clone", "", vapply(spec$clones, function(c) c$name, ""))
+  stopifnot(identical(clone_rows, as.character(seq_len(n_c))))
+  removed     <- as.character(unlist(spec$non_tree_clusters))
+  stopifnot(!any(removed %in% clone_rows))
 
   ccf_mat <- build_ccf_matrix(n_c, n_s)
   rownames(ccf_mat) <- clone_rows
@@ -159,7 +165,7 @@ build_bundle <- function(spec) {
     merged_clusters                = FALSE,
     noisy_clusters_adjusted        = FALSE,
     cpn_removed_clusters           = character(0),
-    tree_removed_clusters          = character(0),
+    tree_removed_clusters          = removed,
     graph_pyclone                  = list(
       sampleID       = short_id,
       long_sampleID  = long_id,
@@ -186,7 +192,7 @@ build_bundle <- function(spec) {
 
 # ---- build the cohort list --------------------------------------------------
 
-resolved <- Filter(function(x) identical(x$status, "resolved"), manifest$tumours)
+resolved <- Filter(function(x) isTRUE(x$has_tree), manifest$tumours)
 cat(sprintf(
   "generating conipher_trees mock: %d resolved tumours (of %d total)\n",
   length(resolved), length(manifest$tumours)
