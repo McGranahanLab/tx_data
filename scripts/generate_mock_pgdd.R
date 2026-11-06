@@ -151,6 +151,10 @@ scenarios <- list(
 
 stopifnot(setequal(names(scenarios), names(samples_by_tumour)))
 
+# Scenario keys follow the muttable form (LTX0001_tumour1, used to look up samples);
+# PGDD is run on the canonical form used by the lab's PGDD runs (LTX0001-Tumour1).
+canonical_tumour_id <- function(x) sub("_tumour", "-Tumour", x, fixed = TRUE)
+
 # ---- build per-mutation input ----
 bases <- c("A", "C", "G", "T")
 rows <- list()
@@ -174,7 +178,7 @@ for (tumour in names(scenarios)) {
         mut_cpn <- abs(rnorm(c$n, 0, 0.03))
       }
       rows[[length(rows) + 1]] <- data.table(
-        tumour_id = tumour, chromosome = chrom, position = pos, ref = ref, alt = alt,
+        tumour_id = canonical_tumour_id(tumour), chromosome = chrom, position = pos, ref = ref, alt = alt,
         cluster_id = c$id, is_clonal_cluster = c$clonal, sample_id = smp[i],
         mut_cpn = round(pmax(mut_cpn, 0), 4), MajCN = majcn, num_gds = g)
     }
@@ -186,7 +190,7 @@ fwrite(input, file.path(syn_dir, "pgdd_input_mock.tsv"), sep = "\t")
 # ---- scenario truth for tests ----
 truth <- lapply(names(scenarios), function(t) {
   sc <- scenarios[[t]]
-  list(tumour_id = t, note = sc$note,
+  list(tumour_id = canonical_tumour_id(t), note = sc$note,
        samples = samples_by_tumour[[t]], num_gds = sc$gds,
        clusters = lapply(sc$clusters, function(c) list(cluster_id = c$id, clonal = c$clonal,
                                                        in_tree = c$in_tree, n = c$n)))
@@ -198,7 +202,8 @@ jsonlite::write_json(list(seed = SEED, pgdd_commit = "cb0437b", tumours = truth)
 # ---- run PGDD (bootstrap on, package defaults otherwise) ----
 out <- detect_par_gd(copy(input), bootstrap_discovery = TRUE, n_boot = 500, seed = 1)
 
-# File names as written by the lab's run wrapper. `*_mut_counts_not_called` and
+# File names as written by the lab's run wrapper. The unstable_calls_* files are
+# for manual review of rejected calls only; nothing downstream ingests them. `*_mut_counts_not_called` and
 # `pgdd_cohort_gd_summary.tsv` are not mocked (not needed for now, per Piotr 2026-11-06).
 files <- c(GDs_per_tumour = "pgdd_GDs_per_tumour.tsv",
            GDs_per_region = "pgdd_GDs_per_region.tsv",

@@ -86,6 +86,10 @@ canonical store + synthetic `nemo_mock/` for local dev. Downstream projects
   Scenario truth: `synthetic/pgdd/pgdd_mock_scenarios.json`.
 - Mock deliberately includes WGD calls on clusters absent from the CONIPHER
   tree, multi-cluster events (`clusters = "3,6"`), and tumours with no tree.
+- `tumour_id` = canonical `LTX0001-Tumour1` (as in real PGDD runs); `sample_id` =
+  muttable `sample_name_hash`.
+- `unstable_calls_*` files are for manual review of rejected calls only; never
+  ingest them downstream.
 - LTX0007 reproduces PGDD's `grepl` substring issue: parallel GDs on
   clusters 2 (R2) and 12 (R3) are merged into one event with `clusters = "2"`.
 
