@@ -1171,7 +1171,8 @@ def main() -> None:
         "note: `conipher_trees` mock (`<MOCK_ROOT>/tx842_trees.RDS`) and the PGDD mock are\n"
         "      produced by `Rscript scripts/generate_mock_conipher_trees.R` and\n"
         "      `Rscript scripts/generate_mock_pgdd.R` — re-run both after this script;\n"
-        "      they read sample hashes and clone sets from `_cohort_manifest.json`."
+        "      they read sample hashes and clone sets from `_cohort_manifest.json`.\n"
+        "      ALPACA WGD ratios: `ALPACA_SRC=... pixi run -e alpaca mocks-alpaca-wgd`."
     )
 
 

@@ -1,0 +1,162 @@
+name: alpaca_wgd_ratios
+cohort: wes   # TRACERx WES (multi-region exome) cohort (see _sources.yml cohorts)
+description: |
+  ALPACA per-clone copy-number increase ratio versus the clone's parent on
+  the tree (`alpaca wgd`). One row per (tumour × clone). A ratio near 2
+  over the genome means the clone doubled relative to its parent: a
+  copy-number signal for a WGD on the edge into that clone. The MRCA is
+  compared against a diploid parent (CN 1|1), so a clonal WGD shows as
+  ratio ≈ 2 at the MRCA.
+
+  Complements `wgd_calls` / PGDD (mutation-timing WGD calls) with a
+  CN-only per-edge measure, and `alpaca` (the per-segment CN it is
+  computed from).
+
+provenance:
+  cohort: TRACERx 842 (Tx842)
+  hpc_source_pattern: /nemo/project/proj-tracerx-lung/tctProjects/lungTx/Tx842/release/tracerx_842/ALPACA/output/tumour_results/<tumour_id>/wgd_ratio_scores.csv
+  hpc_source_status: |
+    ASSUMED. The release path is not confirmed. It is placed next to the
+    cohort ALPACA output (`ALPACA/output/cohort_results/`). An older run
+    wrote `tracerx800/output/tx842/snp_filt_0_cn_rec_FFT/tumour_results/<tumour>/wgd_ratio_scores.csv`.
+  format_on_source: comma-separated CSV, one file per tumour, header row, no index column
+  received: 2026-11-07
+  received_via: Piotr (lab request); columns and semantics read from ALPACA-model source
+  canonical_format: Parquet (after build script) — all tumours concatenated
+  pipeline: |
+    `alpaca wgd --alpaca_output_path <single-tumour ALPACA output csv>
+     --tree_path <tree_paths.json|.nwk> --output_directory <dir>`
+    (McGranahanLab/ALPACA-model 9d3c2f0: alpaca/__main__.py → scripts.py
+    `run_calculate_wgd` → analysis.py `calculate_wgd_ratios`).
+    For each clone, parent = the preceding clone on its tree path
+    (`utils.find_parent`); the MRCA's parent is `diploid` (CN 1|1 at every
+    segment). Per allele X ∈ {A, B, total}:
+      ratio_X = Σ_s len_s · CN_child,X(s) / CN_parent,X(s)  /  Σ_s len_s
+    over the segments s with CN_parent,X(s) > 0; len_s = end − start from
+    the segment name. NaN if the parent has CN 0 everywhere.
+
+primary_key:
+  - tumour_id
+  - clone
+
+grain: one row per (tumour × clone on the ALPACA tree)
+
+genome_build: hg19    # inherited from the ALPACA CN it is computed from
+
+joins:
+  alpaca:
+    on:
+      - "alpaca_wgd_ratios.tumour_id = alpaca.tumour_id"
+      - "alpaca_wgd_ratios.clone = alpaca.clone"
+    notes: "Computed from exactly these ALPACA rows; same clone set per tumour."
+  wgd_calls:
+    on:
+      - "alpaca_wgd_ratios.tumour_id = wgd_calls.tumour_id"
+      - "alpaca_wgd_ratios.clone = wgd_calls.clone"
+    notes: |
+      `parent` should equal `wgd_calls.parent` (both come from the CONIPHER
+      tree; `diploid` at the MRCA in both).
+  clone_proportions:
+    on:
+      - "alpaca_wgd_ratios.tumour_id = clone_proportions.tumour_id"
+      - "alpaca_wgd_ratios.clone = clone_proportions.clone"
+
+filters_of_interest:
+  # Thresholds are analysis parameters, not part of the table.
+  doubled_vs_parent: "ratio_total >= <threshold, e.g. 1.5>"
+  mrca: "parent = 'diploid'"
+
+derived_columns:
+  - name: is_mrca
+    description: "parent == 'diploid' (the tree's MRCA, compared against a diploid parent)."
+    rule: "parent == 'diploid'"
+
+columns:
+  - name: tumour_id
+    type: VARCHAR
+    description: |
+      Canonical tumour ID (`LTX0001-Tumour1`), from the file's `tumour_id`
+      column. The build checks it matches the containing directory name.
+    null_semantics: not_applicable
+
+  - name: clone
+    type: VARCHAR
+    description: "Clone ID (`clone1`, …), as in `alpaca.clone` / `wgd_calls.clone`."
+    null_semantics: not_applicable
+
+  - name: parent
+    type: VARCHAR
+    description: "Parent clone on the tree; `diploid` for the MRCA."
+    null_semantics: not_applicable
+
+  - name: ratio_A
+    type: DOUBLE
+    description: "Segment-length-weighted mean of child CN_A / parent CN_A over segments with parent CN_A > 0."
+    null_semantics: not_applicable
+    notes: "NULL (NaN on source) only if the parent has CN_A = 0 on every segment."
+
+  - name: ratio_B
+    type: DOUBLE
+    description: "As ratio_A for allele B."
+    null_semantics: unknown
+    notes: "NULL also when the source file predates this column (older ALPACA)."
+
+  - name: ratio_total
+    type: DOUBLE
+    description: "As ratio_A for total CN (A + B)."
+    null_semantics: unknown
+    notes: "NULL also when the source file predates this column (older ALPACA)."
+
+  - name: segments_used_A
+    type: BIGINT
+    description: "Number of segments in the ratio_A average (parent CN_A > 0)."
+    null_semantics: unknown
+  - name: segments_used_B
+    type: BIGINT
+    description: "Number of segments in the ratio_B average (parent CN_B > 0)."
+    null_semantics: unknown
+  - name: segments_used_total
+    type: BIGINT
+    description: "Number of segments in the ratio_total average (parent total CN > 0)."
+    null_semantics: unknown
+
+  - name: weight_sum_A
+    type: DOUBLE
+    description: "Sum of segment lengths (bp, end − start) in the ratio_A average."
+    null_semantics: unknown
+  - name: weight_sum_B
+    type: DOUBLE
+    description: "Sum of segment lengths (bp) in the ratio_B average."
+    null_semantics: unknown
+  - name: weight_sum_total
+    type: DOUBLE
+    description: "Sum of segment lengths (bp) in the ratio_total average."
+    null_semantics: unknown
+
+  - name: is_mrca
+    type: BOOLEAN
+    description: "parent == 'diploid'."
+    null_semantics: not_applicable
+    derived: true
+
+relationships:
+  - column: [tumour_id, clone]
+    references: [alpaca.tumour_id, alpaca.clone]
+  - column: [tumour_id, clone]
+    references: [wgd_calls.tumour_id, wgd_calls.clone]
+  - column: [tumour_id, parent]
+    references: [alpaca.tumour_id, alpaca.clone]
+    notes: "Except parent = 'diploid'."
+
+scope_notes: |
+  Per-tumour files, concatenated by the build. Only tumours ALPACA ran on
+  (those with a tree). Allele A/B are ALPACA's labels, not major/minor, so
+  ratio_A and ratio_B are not interchangeable across clones of different
+  tumours. The ratio averages over segments only, so it is not exactly
+  "ploidy ratio": segments where the parent is 0 for that allele drop out.
+
+open_questions:
+  - "Confirm the real path of wgd_ratio_scores.csv in the tx842 release, and that the release ALPACA run included `alpaca wgd` at all (the pattern above is a guess next to `ALPACA/output/cohort_results/`)."
+  - "Older ALPACA versions may have written only tumour_id, clone, parent, ratio_A. The loader fills ratio_B, ratio_total, segments_used_* and weight_sum_* with NULL when absent and logs which files lacked them; check which version produced the release files."
+  - "Were the release ratios computed on the same ALPACA output as `all_tumours_combined.csv` (same run)? If not, they can disagree with `alpaca`."
+  - "chrX / chrY: included in the average? Males have parent CN_B = 0 on X, which drops those segments from ratio_B only."

@@ -169,6 +169,26 @@ sources:
       wgd_calls directly (canonical `LTX0001-Tumour1`, string `clone1`).
       Segment field is `<chr>_<start>_<end>` — parsed by the loader.
 
+  alpaca_wgd_ratios:
+    cohort: wes
+    # ASSUMED path (not confirmed on Nemo): next to the cohort ALPACA output.
+    # An older run wrote tracerx800/output/tx842/snp_filt_0_cn_rec_FFT/tumour_results/<tumour>/wgd_ratio_scores.csv.
+    relative_path_pattern: "ALPACA/output/tumour_results/{tumour_id}/wgd_ratio_scores.csv"
+    format: csv
+    header: true
+    per_tumour: true
+    per_tumour_layout: nested        # each tumour has its own `<tumour_id>/` directory
+    tumour_id_form: "LTX0001-Tumour1"   # canonical; also in the file's `tumour_id` column
+    received: 2026-11-07
+    received_via: Piotr (lab request); format from ALPACA-model source (9d3c2f0, `alpaca wgd`)
+    notes: |
+      Output of `alpaca wgd` (`calculate_wgd_ratios`), run per tumour on
+      that tumour's ALPACA output + tree_paths.json. One row per clone:
+      tumour_id, clone, parent, ratio_A, ratio_B, ratio_total,
+      segments_used_{A,B,total}, weight_sum_{A,B,total}. Older ALPACA
+      versions may have written only tumour_id, clone, parent, ratio_A;
+      the loader fills missing optional columns with null.
+
   clone_proportions:
     cohort: wes
     relative_path_pattern: "ALPACA/input/{tumour_id}/cp_table.csv"
