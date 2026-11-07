@@ -1,0 +1,4 @@
+tumour_id,clone,parent,ratio_A,ratio_B,ratio_total,segments_used_A,segments_used_B,segments_used_total,weight_sum_A,weight_sum_B,weight_sum_total
+LTX0001-Tumour1,clone1,diploid,1.0,1.0,1.0,10,10,10,82569900.0,82569900.0,82569900.0
+LTX0001-Tumour1,clone2,clone1,1.0,1.7337321469445888,1.3668660734722944,10,10,10,82569900.0,82569900.0,82569900.0
+LTX0001-Tumour1,clone3,clone2,1.0000072061196064,0.3692294044197704,0.6234751606416704,9,10,10,82568710.0,82569900.0,82569900.0

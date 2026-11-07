@@ -72,6 +72,7 @@ canonical store + synthetic `nemo_mock/` for local dev. Downstream projects
 | Build: clinical | ✅ | `src/tx_data/builds/clinical.py` |
 | Mock generator | ✅ | `scripts/generate_mocks.py` |
 | Mock: PGDD outputs (WGD project) | ✅ mock only, no catalog/build yet | `scripts/generate_mock_pgdd.R`, `synthetic/pgdd/`, `nemo_mock/.../WGD/release_tx842/pgdd/` |
+| Catalog + build + mock: alpaca_wgd_ratios (`alpaca wgd`) | ✅ mock; real path unconfirmed | `catalog/alpaca_wgd_ratios.yml`, `src/tx_data/builds/alpaca_wgd_ratios.py`, `scripts/generate_mock_alpaca_wgd.py` |
 | Tests | ✅ | `tests/test_pipeline.py` (6 passing) |
 
 ### PGDD / WGD notes (2026-11-06)
@@ -92,6 +93,31 @@ canonical store + synthetic `nemo_mock/` for local dev. Downstream projects
   ingest them downstream.
 - LTX0007 reproduces PGDD's `grepl` substring issue: parallel GDs on
   clusters 2 (R2) and 12 (R3) are merged into one event with `clusters = "2"`.
+
+### ALPACA WGD ratios notes (2026-11-07)
+
+- `alpaca_wgd_ratios` = ALPACA's per-tumour `wgd_ratio_scores.csv` (`alpaca wgd`,
+  McGranahanLab/ALPACA-model `9d3c2f0`, `analysis.py::calculate_wgd_ratios`),
+  concatenated to one row per (tumour × clone). ratio_X = segment-length-weighted
+  mean of child CN / parent CN over segments with parent CN > 0; MRCA parent is
+  `diploid` (1|1). Requested by Piotr.
+- Release path is a GUESS: `ALPACA/output/tumour_results/<tumour_id>/wgd_ratio_scores.csv`
+  (an old run had `tracerx800/output/tx842/snp_filt_0_cn_rec_FFT/tumour_results/<tumour>/`).
+  Confirm on Nemo, and that the release ran `alpaca wgd` at all.
+- Loader requires tumour_id, clone, parent, ratio_A; other columns are null-filled
+  (older ALPACA wrote only those four).
+- Mock = the real `calculate_wgd_ratios` run on the mock ALPACA CN
+  (`all_tumours_combined.csv`, split per tumour) + the manifest tree converted to
+  `tree_paths.json` (temp files only). Needs the `alpaca` pixi env (pandas, scipy)
+  and an ALPACA-model checkout:
+  `ALPACA_SRC=/path/to/ALPACA-model pixi run -e alpaca mocks-alpaca-wgd`.
+  Re-run after `pixi run mocks` if the ALPACA CN mock changes;
+  `test_wgd_ratios_match_alpaca_cn` fails if it is stale.
+- Mock caveat: the CN mock adds +1 per WGD (`1 + cumulative_gds`), so a second
+  (sequential) WGD has a baseline ratio of 1.5, not 2 (LTX0006 clone3: ratio_total
+  ≈ 1.2 after drift). Drift/LOH on the two large segments (chr10, chr11 ≈ 99% of
+  the weight) can hide a doubling in ratio_A/B: LTX0005 clone5 ratio_A ≈ 1.0 but
+  ratio_total ≈ 2.7; LTX0007 clone4 ratio_A ≈ 1.26, ratio_B ≈ 2.0.
 
 ## How to run (pixi)
 
@@ -123,6 +149,7 @@ WES mock consistency (2026-11-06, `tests/test_mock_consistency.py`):
 - Regenerate in order: `pixi run mocks`, then (R env with jsonlite + data.table)
   `Rscript scripts/generate_mock_conipher_trees.R` and
   `PGDD_SRC=... Rscript scripts/generate_mock_pgdd.R`; both read `_cohort_manifest.json`.
+  Then `ALPACA_SRC=... pixi run -e alpaca mocks-alpaca-wgd` (ALPACA WGD ratios).
 
 Legend: ✅ done · ⏳ in progress or todo.
 
