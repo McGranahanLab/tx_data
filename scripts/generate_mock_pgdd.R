@@ -8,8 +8,8 @@
 #
 # Unlike the other mocks, the output tables are NOT hand-written: this script
 # builds a synthetic per-mutation PGDD *input* table from hand-designed
-# scenarios (below), then runs the real `detect_par_gd()` with
-# bootstrap_discovery = TRUE, so column names, types and the stable/unstable
+# scenarios (below), then runs the real `detect_par_gd()` with Piotr's
+# settings (PGDD_SETTINGS, bootstrap_discovery = TRUE), so column names, types and the stable/unstable
 # split come straight from PGDD. The input is kept at
 # `synthetic/pgdd/pgdd_input_mock.tsv`; the scenario truth at
 # `synthetic/pgdd/pgdd_mock_scenarios.json`.
@@ -52,6 +52,30 @@ dir.create(syn_dir, recursive = TRUE, showWarnings = FALSE)
 
 SEED <- 20261106L
 set.seed(SEED)
+
+# Piotr's PGDD settings, 2026-11-09. Passed explicitly so nothing relies on
+# package defaults (in particular check_mut_cpn_2_threshold, whose NULL default
+# silently falls back to discover_mut_cpn_2_threshold = 1.5).
+# track = FALSE here only to keep logs quiet; Piotr runs with track = TRUE,
+# which is cosmetic (progress messages) and does not change the outputs.
+PGDD_SETTINGS <- list(
+  discover_mut_cpn_2_threshold = 1.5,
+  check_mut_cpn_2_threshold = 1.25,
+  discover_num_muts_threshold = 10,
+  discover_frac_2_cpn_muts_threshold = 0.25,
+  check_frac_2_cpn_muts_threshold = 0.1,
+  discover_num_2_cpn_muts_threshold = 5,
+  check_num_2_cpn_muts_threshold = 3,
+  testing = FALSE,
+  track = FALSE,  # Piotr: TRUE (cosmetic only)
+  bootstrap_discovery = TRUE,
+  n_boot = 500,
+  seed = 1,
+  stability_threshold = 0.7,
+  stability_alpha = 0.05,
+  stability_use_binom_test = TRUE,
+  stability_adjust_method = "BH"
+)
 
 # ---- sample ids + tree clones: from the cohort manifest (generate_mocks.py) ----
 # Same per-region hash as the muttable / purity_ploidy / cp_table / CONIPHER RDS,
@@ -232,8 +256,8 @@ jsonlite::write_json(list(seed = SEED, pgdd_commit = "cb0437b", tumours = truth)
                      file.path(syn_dir, "pgdd_mock_scenarios.json"),
                      auto_unbox = TRUE, pretty = TRUE)
 
-# ---- run PGDD (bootstrap on, package defaults otherwise) ----
-out <- detect_par_gd(copy(input), bootstrap_discovery = TRUE, n_boot = 500, seed = 1)
+# ---- run PGDD with Piotr's settings (see PGDD_SETTINGS at top) ----
+out <- do.call(detect_par_gd, c(list(input = copy(input)), PGDD_SETTINGS))
 
 # File names as written by the lab's run wrapper. The unstable_calls_* files are
 # for manual review of rejected calls only; nothing downstream ingests them. `*_mut_counts_not_called` and
