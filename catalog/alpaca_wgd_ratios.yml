@@ -16,12 +16,18 @@ provenance:
   cohort: TRACERx 842 (Tx842)
   hpc_source_pattern: /nemo/project/proj-tracerx-lung/tctProjects/lungTx/Tx842/release/tracerx_842/ALPACA/output/tumour_results/<tumour_id>/wgd_ratio_scores.csv
   hpc_source_status: |
-    ASSUMED. The release path is not confirmed. It is placed next to the
-    cohort ALPACA output (`ALPACA/output/cohort_results/`). An older run
-    wrote `tracerx800/output/tx842/snp_filt_0_cn_rec_FFT/tumour_results/<tumour>/wgd_ratio_scores.csv`.
+    CONFIRMED by Piotr 2026-11-09: the release files are at
+    `tracerx_842/ALPACA/output/tumour_results/<tumour>/wgd_ratio_scores.csv`
+    (the pattern above). The release run writes the 12-column format
+    (tumour_id, clone, parent, ratio_A, ratio_B, ratio_total,
+    segments_used_A, segments_used_B, segments_used_total, weight_sum_A,
+    weight_sum_B, weight_sum_total) and is consistent with the cohort ALPACA
+    output `ALPACA/output/cohort_results/all_tumours_combined.csv` (`alpaca`).
+    An older run wrote `tracerx800/output/tx842/snp_filt_0_cn_rec_FFT/tumour_results/<tumour>/wgd_ratio_scores.csv`;
+    not used.
   format_on_source: comma-separated CSV, one file per tumour, header row, no index column
   received: 2026-11-07
-  received_via: Piotr (lab request); columns and semantics read from ALPACA-model source
+  received_via: Piotr (lab request); columns and semantics read from ALPACA-model source; path, format and consistency with `alpaca` confirmed by Piotr 2026-11-09
   canonical_format: Parquet (after build script) — all tumours concatenated
   pipeline: |
     `alpaca wgd --alpaca_output_path <single-tumour ALPACA output csv>
@@ -48,7 +54,7 @@ joins:
     on:
       - "alpaca_wgd_ratios.tumour_id = alpaca.tumour_id"
       - "alpaca_wgd_ratios.clone = alpaca.clone"
-    notes: "Computed from exactly these ALPACA rows; same clone set per tumour."
+    notes: "Computed from exactly these ALPACA rows; same clone set per tumour. Same release run as all_tumours_combined.csv (Piotr 2026-11-09)."
   wgd_calls:
     on:
       - "alpaca_wgd_ratios.tumour_id = wgd_calls.tumour_id"
@@ -64,6 +70,10 @@ joins:
 filters_of_interest:
   # Thresholds are analysis parameters, not part of the table.
   doubled_vs_parent: "ratio_total >= <threshold, e.g. 1.5>"
+  # Downstream WGD analysis (Piotr 2026-11-09) uses max(ratio_A, ratio_B):
+  # after doubling, losses show in the minor allele, and with phased data B
+  # is not always the minor allele, so neither ratio alone is reliable.
+  wgd_ratio_max_allele: "greatest(ratio_A, ratio_B) >= <threshold>"
   mrca: "parent = 'diploid'"
 
 derived_columns:
@@ -98,40 +108,40 @@ columns:
   - name: ratio_B
     type: DOUBLE
     description: "As ratio_A for allele B."
-    null_semantics: unknown
-    notes: "NULL also when the source file predates this column (older ALPACA)."
+    null_semantics: not_applicable
+    notes: "NULL (NaN on source) only if the parent has CN_B = 0 on every segment."
 
   - name: ratio_total
     type: DOUBLE
     description: "As ratio_A for total CN (A + B)."
-    null_semantics: unknown
-    notes: "NULL also when the source file predates this column (older ALPACA)."
+    null_semantics: not_applicable
+    notes: "NULL (NaN on source) only if the parent has total CN = 0 on every segment."
 
   - name: segments_used_A
     type: BIGINT
     description: "Number of segments in the ratio_A average (parent CN_A > 0)."
-    null_semantics: unknown
+    null_semantics: not_applicable
   - name: segments_used_B
     type: BIGINT
     description: "Number of segments in the ratio_B average (parent CN_B > 0)."
-    null_semantics: unknown
+    null_semantics: not_applicable
   - name: segments_used_total
     type: BIGINT
     description: "Number of segments in the ratio_total average (parent total CN > 0)."
-    null_semantics: unknown
+    null_semantics: not_applicable
 
   - name: weight_sum_A
     type: DOUBLE
     description: "Sum of segment lengths (bp, end − start) in the ratio_A average."
-    null_semantics: unknown
+    null_semantics: not_applicable
   - name: weight_sum_B
     type: DOUBLE
     description: "Sum of segment lengths (bp) in the ratio_B average."
-    null_semantics: unknown
+    null_semantics: not_applicable
   - name: weight_sum_total
     type: DOUBLE
     description: "Sum of segment lengths (bp) in the ratio_total average."
-    null_semantics: unknown
+    null_semantics: not_applicable
 
   - name: is_mrca
     type: BOOLEAN
@@ -154,9 +164,13 @@ scope_notes: |
   ratio_A and ratio_B are not interchangeable across clones of different
   tumours. The ratio averages over segments only, so it is not exactly
   "ploidy ratio": segments where the parent is 0 for that allele drop out.
+  Downstream decision (Piotr 2026-11-09): the WGD analysis uses
+  max(ratio_A, ratio_B) per clone. After a doubling, subsequent losses show
+  in the minor allele; with phased data B is not always the minor allele,
+  so taking the max picks the allele that kept the doubling.
 
 open_questions:
-  - "Confirm the real path of wgd_ratio_scores.csv in the tx842 release, and that the release ALPACA run included `alpaca wgd` at all (the pattern above is a guess next to `ALPACA/output/cohort_results/`)."
-  - "Older ALPACA versions may have written only tumour_id, clone, parent, ratio_A. The loader fills ratio_B, ratio_total, segments_used_* and weight_sum_* with NULL when absent and logs which files lacked them; check which version produced the release files."
-  - "Were the release ratios computed on the same ALPACA output as `all_tumours_combined.csv` (same run)? If not, they can disagree with `alpaca`."
+  # Resolved 2026-11-09 (Piotr): real path = the pattern above; release run
+  # has the 12-column format (the loader now requires all 12); consistent
+  # with all_tumours_combined.csv (same run). Downstream uses max(ratio_A, ratio_B).
   - "chrX / chrY: included in the average? Males have parent CN_B = 0 on X, which drops those segments from ratio_B only."

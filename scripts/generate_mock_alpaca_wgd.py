@@ -16,9 +16,9 @@ WES mock:
     converted to ALPACA's ``tree_paths.json`` format (trunk → leaf paths).
 
 Both intermediate inputs are written to a temp dir and discarded; only the
-per-tumour outputs land in nemo_mock, at the assumed release path
+per-tumour outputs land in nemo_mock, at the release path
 ``ALPACA/output/tumour_results/<tumour_id>/wgd_ratio_scores.csv``
-(catalog/alpaca_wgd_ratios.yml; real path unconfirmed).
+(catalog/alpaca_wgd_ratios.yml; confirmed by Piotr 2026-11-09).
 
 Requires pandas + scipy (ALPACA's deps) and an ALPACA-model checkout:
 

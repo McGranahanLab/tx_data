@@ -170,17 +170,26 @@ def test_alpaca_wgd_ratios_schema_and_pk():
     assert parents.join(alpaca, on=["tumour_id", "clone"], how="anti").height == 0
 
 
-def test_alpaca_wgd_ratios_reads_legacy_four_column_file(tmp_path):
-    """Older ALPACA wrote only tumour_id, clone, parent, ratio_A: optional columns → null."""
-    from tx_data.builds.alpaca_wgd_ratios import OPTIONAL, SCHEMA, read_wgd_ratio_file
+def test_alpaca_wgd_ratios_requires_twelve_columns(tmp_path):
+    """Release format has 12 columns (Piotr 2026-11-09); legacy 4-column files are rejected."""
+    from tx_data.builds.alpaca_wgd_ratios import SCHEMA, read_wgd_ratio_file
 
+    assert list(SCHEMA) == [
+        "tumour_id", "clone", "parent", "ratio_A", "ratio_B", "ratio_total",
+        "segments_used_A", "segments_used_B", "segments_used_total",
+        "weight_sum_A", "weight_sum_B", "weight_sum_total",
+    ]
     p = tmp_path / "wgd_ratio_scores.csv"
-    p.write_text("tumour_id,clone,parent,ratio_A\n"
-                 "LTX0001-Tumour1,clone1,diploid,2.0\nLTX0001-Tumour1,clone2,clone1,\n")
-    df, missing = read_wgd_ratio_file(p, "LTX0001-Tumour1")
-    assert missing == list(OPTIONAL)
+    p.write_text(",".join(SCHEMA) + "\n"
+                 "LTX0001-Tumour1,clone1,diploid,2.0,2.0,2.0,3,3,3,100,100,100\n"
+                 "LTX0001-Tumour1,clone2,clone1,,1.0,1.0,0,3,3,0,100,100\n")
+    df = read_wgd_ratio_file(p, "LTX0001-Tumour1")
     assert df.schema == SCHEMA
     assert df["ratio_A"].to_list() == [2.0, None]
-    assert df.select(list(OPTIONAL)).null_count().row(0) == (2,) * len(OPTIONAL)
     with pytest.raises(ValueError, match="directory"):
         read_wgd_ratio_file(p, "LTX0002-Tumour1")
+
+    legacy = tmp_path / "legacy.csv"
+    legacy.write_text("tumour_id,clone,parent,ratio_A\nLTX0001-Tumour1,clone1,diploid,2.0\n")
+    with pytest.raises(ValueError, match="missing required columns"):
+        read_wgd_ratio_file(legacy, "LTX0001-Tumour1")

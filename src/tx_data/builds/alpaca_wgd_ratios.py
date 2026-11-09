@@ -4,10 +4,10 @@ Reads every per-tumour ALPACA `wgd_ratio_scores.csv` (output of
 `alpaca wgd`, one row per clone) and concatenates them into one long
 table keyed by (tumour_id, clone). Adds `is_mrca` (parent == 'diploid').
 
-Required source columns: tumour_id, clone, parent, ratio_A. The rest
-(ratio_B, ratio_total, segments_used_*, weight_sum_*) are filled with null
-when a file lacks them: older ALPACA versions wrote only the first four
-(catalog/alpaca_wgd_ratios.yml open_questions).
+All 12 source columns are required (tumour_id, clone, parent, ratio_A/B/total,
+segments_used_A/B/total, weight_sum_A/B/total): Piotr confirmed 2026-11-09
+that the release run writes this format. Older 4-column files (tumour_id,
+clone, parent, ratio_A) are rejected rather than null-filled.
 """
 
 from __future__ import annotations
@@ -21,13 +21,11 @@ from tx_data.sources import resolve_source
 
 TABLE = "alpaca_wgd_ratios"
 
-REQUIRED = {
+SCHEMA = {
     "tumour_id": pl.String,
     "clone": pl.String,
     "parent": pl.String,
     "ratio_A": pl.Float64,
-}
-OPTIONAL = {
     "ratio_B": pl.Float64,
     "ratio_total": pl.Float64,
     "segments_used_A": pl.Int64,
@@ -37,7 +35,6 @@ OPTIONAL = {
     "weight_sum_B": pl.Float64,
     "weight_sum_total": pl.Float64,
 }
-SCHEMA = {**REQUIRED, **OPTIONAL}
 
 
 def _discover() -> list[tuple[str, Path]]:
@@ -54,19 +51,18 @@ def _discover() -> list[tuple[str, Path]]:
     ]
 
 
-def read_wgd_ratio_file(path: Path, tumour_dir: str) -> tuple[pl.DataFrame, list[str]]:
-    """Read one `wgd_ratio_scores.csv` → (canonical frame, missing optional columns)."""
+def read_wgd_ratio_file(path: Path, tumour_dir: str) -> pl.DataFrame:
+    """Read one `wgd_ratio_scores.csv` → canonical frame (all 12 columns required)."""
     df = pl.read_csv(
         path,
         null_values=["NA", "", "nan", "NaN"],
         infer_schema_length=10000,
-        schema_overrides={c: t for c, t in REQUIRED.items()},
+        schema_overrides={c: t for c, t in SCHEMA.items() if t == pl.String},
     )
-    missing_req = [c for c in REQUIRED if c not in df.columns]
-    if missing_req:
-        raise ValueError(f"{path}: missing required columns {missing_req}")
-    missing_opt = [c for c in OPTIONAL if c not in df.columns]
-    df = df.with_columns(pl.lit(None, dtype=OPTIONAL[c]).alias(c) for c in missing_opt)
+    missing = [c for c in SCHEMA if c not in df.columns]
+    if missing:
+        raise ValueError(f"{path}: missing required columns {missing} "
+                         "(expected the 12-column release format)")
     df = df.select(pl.col(c).cast(t, strict=True) for c, t in SCHEMA.items())
     # pandas writes NaN as an empty field (read as null); ratio NaN → null.
     df = df.with_columns(pl.col(pl.Float64).fill_nan(None))
@@ -76,7 +72,7 @@ def read_wgd_ratio_file(path: Path, tumour_dir: str) -> tuple[pl.DataFrame, list
         raise ValueError(f"{path}: tumour_id {sorted(ids)} != directory {tumour_dir!r}")
     # Clone IDs are already canonical (`clone1`) in ALPACA output, as in the
     # `alpaca` table; kept verbatim.
-    return df, missing_opt
+    return df
 
 
 def build() -> pl.DataFrame:
@@ -85,10 +81,7 @@ def build() -> pl.DataFrame:
 
     frames: list[pl.DataFrame] = []
     for tumour_dir, path in files:
-        df, missing = read_wgd_ratio_file(path, tumour_dir)
-        if missing:
-            log(f"{TABLE}: {tumour_dir} lacks {missing} (older ALPACA?) — filled with null")
-        frames.append(df)
+        frames.append(read_wgd_ratio_file(path, tumour_dir))
 
     df = (
         pl.concat(frames, how="vertical")

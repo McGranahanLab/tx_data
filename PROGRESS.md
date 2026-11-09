@@ -72,7 +72,7 @@ canonical store + synthetic `nemo_mock/` for local dev. Downstream projects
 | Build: clinical | ✅ | `src/tx_data/builds/clinical.py` |
 | Mock generator | ✅ | `scripts/generate_mocks.py` |
 | Mock: PGDD outputs (WGD project) | ✅ mock only, no catalog/build yet | `scripts/generate_mock_pgdd.R`, `synthetic/pgdd/`, `nemo_mock/.../WGD/release_tx842/pgdd/` |
-| Catalog + build + mock: alpaca_wgd_ratios (`alpaca wgd`) | ✅ mock; real path unconfirmed | `catalog/alpaca_wgd_ratios.yml`, `src/tx_data/builds/alpaca_wgd_ratios.py`, `scripts/generate_mock_alpaca_wgd.py` |
+| Catalog + build + mock: alpaca_wgd_ratios (`alpaca wgd`) | ✅ mock; real path confirmed (Piotr 2026-11-09) | `catalog/alpaca_wgd_ratios.yml`, `src/tx_data/builds/alpaca_wgd_ratios.py`, `scripts/generate_mock_alpaca_wgd.py` |
 | Tests | ✅ | `tests/test_pipeline.py` (6 passing) |
 
 ### PGDD / WGD notes (2026-11-06)
@@ -101,11 +101,12 @@ canonical store + synthetic `nemo_mock/` for local dev. Downstream projects
   concatenated to one row per (tumour × clone). ratio_X = segment-length-weighted
   mean of child CN / parent CN over segments with parent CN > 0; MRCA parent is
   `diploid` (1|1). Requested by Piotr.
-- Release path is a GUESS: `ALPACA/output/tumour_results/<tumour_id>/wgd_ratio_scores.csv`
-  (an old run had `tracerx800/output/tx842/snp_filt_0_cn_rec_FFT/tumour_results/<tumour>/`).
-  Confirm on Nemo, and that the release ran `alpaca wgd` at all.
-- Loader requires tumour_id, clone, parent, ratio_A; other columns are null-filled
-  (older ALPACA wrote only those four).
+- Release path CONFIRMED by Piotr 2026-11-09: `ALPACA/output/tumour_results/<tumour_id>/wgd_ratio_scores.csv`
+  (an old, unused run had `tracerx800/output/tx842/snp_filt_0_cn_rec_FFT/tumour_results/<tumour>/`).
+  Release run has the 12-column format and is consistent with `all_tumours_combined.csv`.
+- Loader requires all 12 columns; older 4-column files are rejected.
+- Downstream (Piotr 2026-11-09): the WGD analysis uses max(ratio_A, ratio_B) (after
+  doubling, losses show in the minor allele; with phased data B is not always minor).
 - Mock = the real `calculate_wgd_ratios` run on the mock ALPACA CN
   (`all_tumours_combined.csv`, split per tumour) + the manifest tree converted to
   `tree_paths.json` (temp files only). Needs the `alpaca` pixi env (pandas, scipy)
