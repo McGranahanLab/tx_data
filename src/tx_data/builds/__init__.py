@@ -2,6 +2,7 @@
 
 from tx_data.builds import (
     alpaca,
+    alpaca_corrected,
     alpaca_wgd_ratios,
     alphamissense,
     clinical,
@@ -30,6 +31,7 @@ __all__ = [
     "driver_list",
     "alpaca",
     "alpaca_wgd_ratios",
+    "alpaca_corrected",
     "kallisto",
     "clone_proportions",
     "id_crosswalk",
@@ -52,6 +54,7 @@ BUILDERS = {
     "driver_list": driver_list.build,
     "alpaca": alpaca.build,
     "alpaca_wgd_ratios": alpaca_wgd_ratios.build,
+    "alpaca_corrected": alpaca_corrected.build,
     "kallisto": kallisto.build,
     "clone_proportions": clone_proportions.build,
     "id_crosswalk": id_crosswalk.build,

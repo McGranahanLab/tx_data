@@ -193,3 +193,51 @@ def test_alpaca_wgd_ratios_requires_twelve_columns(tmp_path):
     legacy.write_text("tumour_id,clone,parent,ratio_A\nLTX0001-Tumour1,clone1,diploid,2.0\n")
     with pytest.raises(ValueError, match="missing required columns"):
         read_wgd_ratio_file(legacy, "LTX0001-Tumour1")
+
+
+def _sql_schema(name):
+    from tx_data.catalog import load_catalog
+
+    cat = load_catalog(name)
+    sql_to_pl = {"VARCHAR": pl.String, "DOUBLE": pl.Float64, "BIGINT": pl.Int64, "BOOLEAN": pl.Boolean}
+    return cat, {c["name"]: sql_to_pl[c["type"]] for c in cat["columns"]}
+
+
+def test_alpaca_corrected_schema_and_rows():
+    """Same rows as alpaca; uncorrected rows keep ALPACA's CN; derived columns follow the corrected CN."""
+    df = pl.read_parquet(DATA / "alpaca_corrected.parquet")
+    cat, schema = _sql_schema("alpaca_corrected")
+    assert df.schema == schema
+    assert df.select(cat["primary_key"]).is_unique().all()
+    alpaca = pl.read_parquet(DATA / "alpaca.parquet")
+    keys = ["tumour_id", "segment", "clone"]
+    assert df.select(keys).sort(keys).equals(alpaca.select(keys).sort(keys))
+    m = df.join(alpaca.select(*keys, pl.col("pred_CN_A").alias("a0"), pl.col("pred_CN_B").alias("b0")), on=keys)
+    assert (m["pred_CN_A_original"] == m["a0"]).all() and (m["pred_CN_B_original"] == m["b0"]).all()
+    same = m.filter(~pl.col("corrected"))
+    assert (same["pred_CN_A"] == same["a0"]).all() and (same["pred_CN_B"] == same["b0"]).all()
+    assert (df["total_cn"] == df["pred_CN_A"] + df["pred_CN_B"]).all()
+
+
+def test_alpaca_wgd_ratios_corrected_schema():
+    df = pl.read_parquet(DATA / "alpaca_wgd_ratios_corrected.parquet")
+    cat, schema = _sql_schema("alpaca_wgd_ratios_corrected")
+    assert df.schema == schema
+    assert df.select(cat["primary_key"]).is_unique().all()
+    ref = pl.read_parquet(DATA / "alpaca_wgd_ratios.parquet")
+    assert df.join(ref, on=["tumour_id", "clone"], how="anti").height == 0
+    # where nothing was corrected, the recomputed ratios equal ALPACA's
+    corrected_t = set(pl.read_parquet(DATA / "alpaca_corrected.parquet").filter("corrected")["tumour_id"])
+    m = df.filter(~pl.col("tumour_id").is_in(list(corrected_t))).join(ref, on=["tumour_id", "clone"], suffix="_ref")
+    assert ((m["ratio_A"] - m["ratio_A_ref"]).abs() < 1e-9).all()
+
+
+def test_alpaca_corrected_rejects_silent_changes(tmp_path):
+    from tx_data.builds.alpaca_corrected import read_corrected
+
+    df = pl.read_parquet(DATA / "alpaca_corrected.parquet")
+    bad = df.with_columns(pl.when(pl.int_range(pl.len()) == 0).then(pl.col("pred_CN_A") + 1)
+                          .otherwise(pl.col("pred_CN_A")).alias("pred_CN_A"))
+    bad.write_parquet(tmp_path / "x.parquet")
+    with pytest.raises(ValueError, match="without corrected"):
+        read_corrected(tmp_path / "x.parquet")

@@ -190,6 +190,31 @@ sources:
       has all 12 columns (Piotr 2026-11-09); the loader requires all 12 and
       rejects older 4-column files (tumour_id, clone, parent, ratio_A).
 
+  alpaca_corrected:
+    cohort: wes
+    # PROPOSED path (Darwin, 2026-11-13), to confirm with Piotr: output of
+    # darwins_analysis/alpaca_post_hoc_correction run on the release ALPACA + WGD calls.
+    relative_path: ALPACA/output/post_hoc_corrected/alpaca_corrected.parquet
+    format: parquet
+    received: 2026-11-13
+    received_via: darwins_analysis alpaca_post_hoc_correction (Piotr's request, 2026-11-13)
+    notes: |
+      `alpaca` with the copy number of missing clones re-inferred from the agreed WGD calls
+      (absent, GD-free clones above parallel GDs, which ALPACA's parsimony made look doubled).
+      Same rows and columns as `alpaca`, plus pred_CN_A_original, pred_CN_B_original, corrected.
+
+  alpaca_wgd_ratios_corrected:
+    cohort: wes
+    # PROPOSED path (Darwin, 2026-11-13), to confirm with Piotr.
+    relative_path: ALPACA/output/post_hoc_corrected/wgd_ratios_corrected.tsv
+    format: tsv
+    header: true
+    received: 2026-11-13
+    received_via: darwins_analysis alpaca_post_hoc_correction (Piotr's request, 2026-11-13)
+    notes: |
+      ALPACA's 12-column WGD ratios recomputed (port of `calculate_wgd_ratios`) from
+      `alpaca_corrected`. One row per (tumour, clone) for tumours the correction ran on.
+
   clone_proportions:
     cohort: wes
     relative_path_pattern: "ALPACA/input/{tumour_id}/cp_table.csv"

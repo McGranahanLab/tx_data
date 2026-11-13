@@ -27,6 +27,8 @@ TABLES = (
     "driver_list",
     "alpaca",
     "alpaca_wgd_ratios",
+    # alpaca_corrected emits TWO parquets (alpaca_corrected, alpaca_wgd_ratios_corrected)
+    "alpaca_corrected",
     "kallisto",
     "clone_proportions",
     # id_crosswalk must come before clone_info / seeding_table — the latter
@@ -88,6 +90,11 @@ def _write_manifest(
             p2 = data_dir / "kallisto_paired_normals.parquet"
             if p2.is_file():
                 row_counts["kallisto_paired_normals"] = pl.read_parquet(p2).height
+        # alpaca_corrected builder also emits alpaca_wgd_ratios_corrected.
+        if name == "alpaca_corrected":
+            p2 = data_dir / "alpaca_wgd_ratios_corrected.parquet"
+            if p2.is_file():
+                row_counts["alpaca_wgd_ratios_corrected"] = pl.read_parquet(p2).height
         # conipher_trees builder emits two parquets, neither named after the table.
         if name == "conipher_trees":
             for sub in ("conipher_ccf", "conipher_clonality"):
