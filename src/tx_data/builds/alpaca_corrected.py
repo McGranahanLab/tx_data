@@ -4,9 +4,18 @@ Reads the output of darwins_analysis `alpaca_post_hoc_correction` (ALPACA copy n
 missing clones re-inferred from the agreed WGD calls, and the WGD ratios recomputed from it).
 Checks the corrected table has exactly the keys of `alpaca` and that uncorrected rows keep
 ALPACA's copy number (`pred_CN_*_original`).
+
+Where the correction output lives is a build parameter (Piotr, 2026-11-13: nothing hardcoded):
+`build(source_dir=...)`, `scripts/build_alpaca_corrected.py --source-dir <dir>`, or the
+environment variable TX_ALPACA_CORRECTED_DIR (used by build_all). The directory holds
+`alpaca_corrected.parquet` and `wgd_ratios_corrected.tsv` as written by the correction's `--out`.
+Without one, the `_sources.yml` entries are used, which point at the mock layout in nemo_mock/.
 """
 
 from __future__ import annotations
+
+import os
+from pathlib import Path
 
 import polars as pl
 
@@ -56,14 +65,23 @@ def read_ratios(path) -> pl.DataFrame:
     return df
 
 
-def build() -> pl.DataFrame:
-    src = resolve_source(TABLE)
+ENV_DIR = "TX_ALPACA_CORRECTED_DIR"
+
+
+def _sources(source_dir: Path | None) -> tuple[Path, Path]:
+    d = source_dir or (Path(os.environ[ENV_DIR]) if os.environ.get(ENV_DIR) else None)
+    if d is not None:
+        return Path(d) / "alpaca_corrected.parquet", Path(d) / "wgd_ratios_corrected.tsv"
+    return resolve_source(TABLE), resolve_source(RATIOS)
+
+
+def build(source_dir: Path | None = None) -> pl.DataFrame:
+    src, rsrc = _sources(source_dir)
     log(f"read {src}")
     df = read_corrected(src)
     out = canonical_output_path(TABLE)
     df.write_parquet(out)
     log(f"wrote {out} ({df.height} rows × {df.width} cols; {int(df['corrected'].sum())} corrected)")
-    rsrc = resolve_source(RATIOS)
     log(f"read {rsrc}")
     r = read_ratios(rsrc)
     rout = canonical_output_path(RATIOS)

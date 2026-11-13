@@ -241,3 +241,20 @@ def test_alpaca_corrected_rejects_silent_changes(tmp_path):
     bad.write_parquet(tmp_path / "x.parquet")
     with pytest.raises(ValueError, match="without corrected"):
         read_corrected(tmp_path / "x.parquet")
+
+
+def test_alpaca_corrected_location_is_a_parameter(tmp_path, monkeypatch):
+    """Piotr, 2026-11-13: the correction output location is passed at build time, not hardcoded."""
+    import shutil
+
+    from tx_data.builds import alpaca_corrected as ac
+    from tx_data.sources import resolve_source
+
+    src = resolve_source(ac.TABLE).parent
+    d = tmp_path / "run"
+    shutil.copytree(src, d)
+    assert ac._sources(d) == (d / "alpaca_corrected.parquet", d / "wgd_ratios_corrected.tsv")
+    monkeypatch.setenv(ac.ENV_DIR, str(d))
+    assert ac._sources(None)[0] == d / "alpaca_corrected.parquet"
+    monkeypatch.delenv(ac.ENV_DIR)
+    assert ac._sources(None)[0] == resolve_source(ac.TABLE)

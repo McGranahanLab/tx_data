@@ -73,7 +73,7 @@ canonical store + synthetic `nemo_mock/` for local dev. Downstream projects
 | Mock generator | ✅ | `scripts/generate_mocks.py` |
 | Mock: PGDD outputs (WGD project) | ✅ mock only, no catalog/build yet | `scripts/generate_mock_pgdd.R`, `synthetic/pgdd/`, `nemo_mock/.../WGD/release_tx842/pgdd/` |
 | Catalog + build + mock: alpaca_wgd_ratios (`alpaca wgd`) | ✅ mock; real path confirmed (Piotr 2026-11-09) | `catalog/alpaca_wgd_ratios.yml`, `src/tx_data/builds/alpaca_wgd_ratios.py`, `scripts/generate_mock_alpaca_wgd.py` |
-| Catalog + build + mock: alpaca_corrected + alpaca_wgd_ratios_corrected (darwins_analysis `alpaca_post_hoc_correction`) | ✅ mock (no clone corrected with the placeholder wgd_calls); real path PROPOSED, to confirm (2026-11-13) | `catalog/alpaca_corrected.yml`, `catalog/alpaca_wgd_ratios_corrected.yml`, `src/tx_data/builds/alpaca_corrected.py`, `scripts/generate_mock_alpaca_corrected.py` |
+| Catalog + build + mock: alpaca_corrected + alpaca_wgd_ratios_corrected (darwins_analysis `alpaca_post_hoc_correction`) | ✅ mock (no clone corrected with the placeholder wgd_calls); location passed at build time (`--source-dir` / `TX_ALPACA_CORRECTED_DIR`), nothing hardcoded (Piotr, 2026-11-13). TODO: realistic mocks (absent parents above parallel GDs, matching WGD calls) so the correction is exercised on the mock cohort | `catalog/alpaca_corrected.yml`, `catalog/alpaca_wgd_ratios_corrected.yml`, `src/tx_data/builds/alpaca_corrected.py`, `scripts/generate_mock_alpaca_corrected.py` |
 | Tests | ✅ | `tests/test_pipeline.py` (6 passing) |
 
 ### PGDD / WGD notes (2026-11-06)

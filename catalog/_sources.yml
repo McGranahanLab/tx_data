@@ -192,8 +192,8 @@ sources:
 
   alpaca_corrected:
     cohort: wes
-    # PROPOSED path (Darwin, 2026-11-13), to confirm with Piotr: output of
-    # darwins_analysis/alpaca_post_hoc_correction run on the release ALPACA + WGD calls.
+    # Mock layout only. The real location is a build parameter (Piotr, 2026-11-13: nothing
+    # hardcoded): --source-dir or TX_ALPACA_CORRECTED_DIR (src/tx_data/builds/alpaca_corrected.py).
     relative_path: ALPACA/output/post_hoc_corrected/alpaca_corrected.parquet
     format: parquet
     received: 2026-11-13
@@ -205,7 +205,7 @@ sources:
 
   alpaca_wgd_ratios_corrected:
     cohort: wes
-    # PROPOSED path (Darwin, 2026-11-13), to confirm with Piotr.
+    # Mock layout only; real location = build parameter (see alpaca_corrected).
     relative_path: ALPACA/output/post_hoc_corrected/wgd_ratios_corrected.tsv
     format: tsv
     header: true
