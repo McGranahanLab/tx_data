@@ -146,3 +146,50 @@ def test_clone_proportions_joins_wgd_calls():
     wgd_keys = wgd.select(["tumour_id", "clone"]).unique()
     orphans = cp_keys.join(wgd_keys, on=["tumour_id", "clone"], how="anti")
     assert orphans.height == 0, f"clones in cp_table not in wgd_calls: {orphans}"
+
+
+def test_alpaca_wgd_ratios_schema_and_pk():
+    """Columns/types follow the catalog; one row per (tumour_id, clone); one MRCA per tumour."""
+    from tx_data.catalog import load_catalog
+
+    df = pl.read_parquet(DATA / "alpaca_wgd_ratios.parquet")
+    cat = load_catalog("alpaca_wgd_ratios")
+    sql_to_pl = {"VARCHAR": pl.String, "DOUBLE": pl.Float64, "BIGINT": pl.Int64, "BOOLEAN": pl.Boolean}
+    assert df.schema == {c["name"]: sql_to_pl[c["type"]] for c in cat["columns"]}
+    assert df.height > 0
+    assert df.select(cat["primary_key"]).is_unique().all()
+    assert df["tumour_id"].str.contains("-Tumour").all()
+    assert df["clone"].str.starts_with("clone").all()
+    mrca = df.filter(pl.col("is_mrca"))
+    assert (mrca["parent"] == "diploid").all()
+    assert sorted(mrca["tumour_id"]) == sorted(df["tumour_id"].unique())
+    # Every (tumour, clone) and every non-diploid parent is a clone in ALPACA.
+    alpaca = pl.read_parquet(DATA / "alpaca.parquet").select("tumour_id", "clone").unique()
+    assert df.join(alpaca, on=["tumour_id", "clone"], how="anti").height == 0
+    parents = df.filter(~pl.col("is_mrca")).select("tumour_id", pl.col("parent").alias("clone"))
+    assert parents.join(alpaca, on=["tumour_id", "clone"], how="anti").height == 0
+
+
+def test_alpaca_wgd_ratios_requires_twelve_columns(tmp_path):
+    """Release format has 12 columns (Piotr 2026-11-09); legacy 4-column files are rejected."""
+    from tx_data.builds.alpaca_wgd_ratios import SCHEMA, read_wgd_ratio_file
+
+    assert list(SCHEMA) == [
+        "tumour_id", "clone", "parent", "ratio_A", "ratio_B", "ratio_total",
+        "segments_used_A", "segments_used_B", "segments_used_total",
+        "weight_sum_A", "weight_sum_B", "weight_sum_total",
+    ]
+    p = tmp_path / "wgd_ratio_scores.csv"
+    p.write_text(",".join(SCHEMA) + "\n"
+                 "LTX0001-Tumour1,clone1,diploid,2.0,2.0,2.0,3,3,3,100,100,100\n"
+                 "LTX0001-Tumour1,clone2,clone1,,1.0,1.0,0,3,3,0,100,100\n")
+    df = read_wgd_ratio_file(p, "LTX0001-Tumour1")
+    assert df.schema == SCHEMA
+    assert df["ratio_A"].to_list() == [2.0, None]
+    with pytest.raises(ValueError, match="directory"):
+        read_wgd_ratio_file(p, "LTX0002-Tumour1")
+
+    legacy = tmp_path / "legacy.csv"
+    legacy.write_text("tumour_id,clone,parent,ratio_A\nLTX0001-Tumour1,clone1,diploid,2.0\n")
+    with pytest.raises(ValueError, match="missing required columns"):
+        read_wgd_ratio_file(legacy, "LTX0001-Tumour1")

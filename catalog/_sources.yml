@@ -169,6 +169,27 @@ sources:
       wgd_calls directly (canonical `LTX0001-Tumour1`, string `clone1`).
       Segment field is `<chr>_<start>_<end>` — parsed by the loader.
 
+  alpaca_wgd_ratios:
+    cohort: wes
+    # Path CONFIRMED by Piotr 2026-11-09 (tracerx_842/ALPACA/output/tumour_results/<tumour>/).
+    # Release run = 12-column format, consistent with all_tumours_combined.csv.
+    # (An older, unused run wrote tracerx800/output/tx842/snp_filt_0_cn_rec_FFT/tumour_results/<tumour>/wgd_ratio_scores.csv.)
+    relative_path_pattern: "ALPACA/output/tumour_results/{tumour_id}/wgd_ratio_scores.csv"
+    format: csv
+    header: true
+    per_tumour: true
+    per_tumour_layout: nested        # each tumour has its own `<tumour_id>/` directory
+    tumour_id_form: "LTX0001-Tumour1"   # canonical; also in the file's `tumour_id` column
+    received: 2026-11-07
+    received_via: Piotr (lab request); format from ALPACA-model source (9d3c2f0, `alpaca wgd`); path/format confirmed by Piotr 2026-11-09
+    notes: |
+      Output of `alpaca wgd` (`calculate_wgd_ratios`), run per tumour on
+      that tumour's ALPACA output + tree_paths.json. One row per clone:
+      tumour_id, clone, parent, ratio_A, ratio_B, ratio_total,
+      segments_used_{A,B,total}, weight_sum_{A,B,total}. The release run
+      has all 12 columns (Piotr 2026-11-09); the loader requires all 12 and
+      rejects older 4-column files (tumour_id, clone, parent, ratio_A).
+
   clone_proportions:
     cohort: wes
     relative_path_pattern: "ALPACA/input/{tumour_id}/cp_table.csv"

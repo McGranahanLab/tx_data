@@ -26,6 +26,7 @@ TABLES = (
     "alphamissense",
     "driver_list",
     "alpaca",
+    "alpaca_wgd_ratios",
     "kallisto",
     "clone_proportions",
     # id_crosswalk must come before clone_info / seeding_table — the latter

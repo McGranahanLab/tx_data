@@ -10,12 +10,16 @@ downstream analyses read):
   ``clone_info`` (``treeClones == FALSE``), the RDS ``tree_removed_clusters``
   and the PGDD scenario truth (``in_tree = FALSE``); PGDD's on-tree clusters
   are the tree clones.
+* ALPACA WGD ratios (``wgd_ratio_scores.csv``): clones and (clone, parent)
+  edges are the tree's (manifest, ``WGD_calls.tsv``, MRCA → ``diploid``), and
+  the ratios re-derive from the ALPACA CN mock (so a stale mock fails).
 * Sample hashes. Each DNA region has one ``sample_name_hash`` across the
   muttable, purity_ploidy, cp_table, the CONIPHER RDS (R-style ``.``/``..``
   separators) and the PGDD outputs, and every one is in the sample-hash map.
 
 The cohort manifest is the generators' shared source; it is checked too.
-Regenerate with ``pixi run mocks`` + the two R generators if this fails.
+Regenerate with ``pixi run mocks`` + the two R generators (+ ``pixi run -e alpaca
+mocks-alpaca-wgd``) if this fails.
 """
 
 from __future__ import annotations
@@ -229,3 +233,72 @@ def test_region_hashes_in_sample_map_once(manifest):
     rna_hashes = {c.rsplit("--", 1)[1] for c in kallisto if "--" in c and "_SU_N" not in c}
     dna = {s["sample_name_hash"].rsplit("--", 1)[1] for m in manifest.values() for s in m["samples"]}
     assert set(smap["sample_hash"]) == dna | rna_hashes
+
+
+# ---- ALPACA WGD ratios (alpaca wgd) ------------------------------------------
+
+WGD_RATIO_DIR = WES / "ALPACA/output/tumour_results"
+
+
+@pytest.fixture(scope="module")
+def wgd_ratios() -> dict[str, pl.DataFrame]:
+    return {p.parent.name: pl.read_csv(p) for p in sorted(WGD_RATIO_DIR.glob("*/wgd_ratio_scores.csv"))}
+
+
+def test_wgd_ratio_clones_and_parents_match_tree(manifest, tree_tumours, cp_tables, wgd_ratios):
+    """Clones = tree clones; (clone, parent) edges = manifest = wgd_calls = MRCA→diploid."""
+    assert set(wgd_ratios) == set(tree_tumours)
+    wgd_calls = pl.read_csv(WES / "WGD/release_tx842/WGD_calls.tsv", separator="\t",
+                            columns=["tumour_id", "clone", "parent"])
+    alpaca_out = pl.read_csv(WES / "ALPACA/output/cohort_results/all_tumours_combined.csv")
+    bad = []
+    for t in tree_tumours:
+        df = wgd_ratios[t]
+        assert set(df["tumour_id"]) == {t}
+        assert df["clone"].is_unique().all(), t
+        edges = {
+            "wgd_ratio_scores": set(zip(df["clone"], df["parent"])),
+            "manifest": {(c["name"], c["parent"]) for c in manifest[t]["clones"]},
+            "wgd_calls": set(zip(*wgd_calls.filter(pl.col("tumour_id") == t)[["clone", "parent"]])),
+        }
+        if len({frozenset(s) for s in edges.values()}) != 1:
+            bad.append(f"{t} edges: {edges}")
+        clones = {c for c, _ in edges["wgd_ratio_scores"]}
+        if clones != set(cp_tables[t]["clone"]) or \
+                clones != set(alpaca_out.filter(pl.col("tumour_id") == t)["clone"]):
+            bad.append(f"{t}: clones {clones} != cp_table / ALPACA output")
+        if df.filter(pl.col("parent") == "diploid").height != 1:
+            bad.append(f"{t}: expected exactly one MRCA with parent `diploid`")
+    assert not bad, "wgd_ratio_scores disagree with the tree:\n" + "\n".join(bad)
+
+
+def test_wgd_ratios_match_alpaca_cn(wgd_ratios):
+    """Re-derive the ratios from the ALPACA CN mock (catches a stale wgd mock).
+
+    Independent of ALPACA's code: segment-length-weighted mean of child/parent
+    CN over segments with parent CN > 0; parent `diploid` = CN 1|1.
+    """
+    cn = pl.read_csv(WES / "ALPACA/output/cohort_results/all_tumours_combined.csv").with_columns(
+        (pl.col("segment").str.split("_").list.get(2).cast(pl.Int64)
+         - pl.col("segment").str.split("_").list.get(1).cast(pl.Int64)).alias("len"),
+        (pl.col("pred_CN_A") + pl.col("pred_CN_B")).alias("pred_CN_total"),
+    )
+    for t, df in wgd_ratios.items():
+        tcn = cn.filter(pl.col("tumour_id") == t)
+        diploid = tcn.filter(pl.col("clone") == tcn["clone"][0]).with_columns(
+            pl.lit("diploid").alias("clone"), pl.lit(1).alias("pred_CN_A"),
+            pl.lit(1).alias("pred_CN_B"), pl.lit(2).alias("pred_CN_total"))
+        parents = pl.concat([tcn, diploid], how="vertical_relaxed").select(
+            pl.col("clone").alias("parent"), "segment",
+            *(pl.col(f"pred_CN_{x}").alias(f"p_{x}") for x in ("A", "B", "total")))
+        j = tcn.join(df.select("clone", "parent"), on="clone").join(parents, on=["parent", "segment"])
+        assert j.height == tcn.height, t
+        for x in ("A", "B", "total"):
+            ok = pl.col(f"p_{x}") > 0
+            exp = j.group_by("clone").agg(
+                ((pl.col(f"pred_CN_{x}") / pl.col(f"p_{x}") * pl.col("len")).filter(ok).sum()
+                 / pl.col("len").filter(ok).sum()).alias("exp"),
+                ok.sum().alias("n"),
+            ).join(df.select("clone", f"ratio_{x}", f"segments_used_{x}"), on="clone")
+            assert ((exp["exp"] - exp[f"ratio_{x}"]).abs() < 1e-9).all(), (t, x, exp)
+            assert (exp["n"] == exp[f"segments_used_{x}"]).all(), (t, x, exp)

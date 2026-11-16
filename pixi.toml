@@ -23,3 +23,16 @@ build    = "python scripts/build_all.py"
 test     = "pytest tests/ -q"
 liftover = "python scripts/liftover_muttable.py"
 all      = { depends-on = ["mocks", "build", "test"] }
+
+# ALPACA's `calculate_wgd_ratios` (pandas + scipy) for the alpaca_wgd_ratios
+# mock. Separate env so the default build/test env stays pandas-free.
+# Needs an ALPACA-model checkout: ALPACA_SRC (default /tmp/alpaca_model).
+[feature.alpaca.dependencies]
+pandas = ">=3.0"
+scipy = "*"
+
+[feature.alpaca.tasks]
+mocks-alpaca-wgd = "python scripts/generate_mock_alpaca_wgd.py"
+
+[environments]
+alpaca = ["alpaca"]
