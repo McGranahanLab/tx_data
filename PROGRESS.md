@@ -112,6 +112,18 @@ Mock cohort: 10 patients, 11 tumours. Covers every wgd_calls `class`
 sequential), status (resolved, unresolved, needs_follow_up), a multi-tumour
 patient (LTX0008), and a tumour with `number_of_gds_at_clone == 2` at MRCA.
 
+WES mock consistency (2026-11-06, `tests/test_mock_consistency.py`):
+- Tree clones = ALPACA's clones (cp_table / all_tumours_combined) = CONIPHER RDS
+  rows = `clone_info.treeClones == TRUE`. Off-tree clusters (LTX0005 6,
+  LTX0006 7, LTX0007 12) are in `clone_info` (`treeClones == FALSE`), the RDS
+  `tree_removed_clusters` and the PGDD scenarios only. LTX0009/LTX0010 have no tree.
+- One DNA hash per region (`generate_mocks.py::_region_hash`), shared by muttable,
+  purity_ploidy, cp_table, CONIPHER RDS and PGDD. Kallisto (RNA) keeps its own.
+- `clone_info` mock is generated (`generate_mocks.py::_write_clone_info`), not hand-written.
+- Regenerate in order: `pixi run mocks`, then (R env with jsonlite + data.table)
+  `Rscript scripts/generate_mock_conipher_trees.R` and
+  `PGDD_SRC=... Rscript scripts/generate_mock_pgdd.R`; both read `_cohort_manifest.json`.
+
 Legend: ✅ done · ⏳ in progress or todo.
 
 ## Layout to build

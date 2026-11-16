@@ -22,10 +22,13 @@ def _run(script: Path) -> None:
         cwd=REPO,
         # Keep the caller's PATH: the conipher_trees build needs Rscript from the pixi env.
         env={"PYTHONPATH": str(SRC), "PATH": os.environ.get("PATH", "/usr/bin:/bin")},
-        check=True,
+        check=False,
         capture_output=True,
     )
-    assert r.returncode == 0, r.stderr.decode()
+    # check=False so a failing build reports its own stderr (e.g. Rscript not
+    # on PATH when pytest runs outside `pixi run`) instead of a bare
+    # CalledProcessError on whichever test runs first.
+    assert r.returncode == 0, f"{script.name} exited {r.returncode}:\n{r.stderr.decode()[-3000:]}"
 
 
 @pytest.fixture(scope="module", autouse=True)
