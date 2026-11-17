@@ -1,0 +1,49 @@
+# Catalog: wgs_conipher_tree_edges (WGS). Added 2026-11-17 for the WGS WGD pipeline.
+name: wgs_conipher_tree_edges
+cohort: wgs
+description: Default (first) CONIPHER tree of each WGS tumour (allTrees.txt, 2026_08_mean_max_absent run), one row
+  per edge. A single-cluster tree is the self-loop 1 -> 1, as CONIPHER writes it.
+provenance:
+  cohort: TRACERx WGS
+  hpc_source: /nemo/project/proj-tracerx-wgs/working/grimesk/CONIPHERwgs/2026_08_mean_max_absent/runs/cleaning_noisefloor_artefact/snv/<wgs_tumour_label>/allTrees.txt
+  format_on_source: 'text: `# tree N` headers, then `parent<TAB>child` edges; one per tumour'
+  received: '2026-11-17'
+  received_via: 'Piotr (Slack DM): paths, folder listings; formats as WES'
+  canonical_format: Parquet (after build script)
+  consumer: darwins_analysis WGD_WGS_pipeline
+primary_key:
+- tumour_id
+- parent_cluster
+- child_cluster
+grain: one row per (WGS tumour x edge of the default tree)
+columns:
+- name: tumour_id
+  type: VARCHAR
+  description: Canonical tumour ID (`LTX0001-Tumour1`), from the WGS inventory via the folder label.
+  null_semantics: not_applicable
+  derived: true
+- name: patient_id
+  type: VARCHAR
+  description: Patient ID (`LTX0001`).
+  null_semantics: not_applicable
+  derived: true
+- name: wgs_tumour_label
+  type: VARCHAR
+  description: Folder name (`LTX0001`, `LTX0104_tumour1`). For locating files only.
+  null_semantics: not_applicable
+  derived: true
+- name: parent_cluster
+  type: BIGINT
+  description: Parent cluster of the edge.
+  null_semantics: not_applicable
+  derived: false
+- name: child_cluster
+  type: BIGINT
+  description: Child cluster (equal to the parent for a single-cluster tree).
+  null_semantics: not_applicable
+  derived: false
+- name: n_trees
+  type: BIGINT
+  description: Number of alternative trees in allTrees.txt (only the first is kept).
+  null_semantics: not_applicable
+  derived: true

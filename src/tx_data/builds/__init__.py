@@ -21,6 +21,11 @@ from tx_data.builds import (
     wgs_clone_proportions,
     wgs_consensus_segments,
     wgs_tree_clones,
+    wgs_conipher_mutations,
+    wgs_conipher_tree_edges,
+    wgs_conipher_cluster_info,
+    wgs_alpaca,
+    wgs_alpaca_wgd_ratios,
 )
 
 __all__ = [
@@ -44,6 +49,11 @@ __all__ = [
     "wgs_consensus_segments",
     "wgs_clone_proportions",
     "wgs_tree_clones",
+    "wgs_conipher_mutations",
+    "wgs_conipher_tree_edges",
+    "wgs_conipher_cluster_info",
+    "wgs_alpaca",
+    "wgs_alpaca_wgd_ratios",
 ]
 
 BUILDERS = {
@@ -67,4 +77,9 @@ BUILDERS = {
     "wgs_consensus_segments": wgs_consensus_segments.build,
     "wgs_clone_proportions": wgs_clone_proportions.build,
     "wgs_tree_clones": wgs_tree_clones.build,
+    "wgs_conipher_mutations": wgs_conipher_mutations.build,
+    "wgs_conipher_tree_edges": wgs_conipher_tree_edges.build,
+    "wgs_conipher_cluster_info": wgs_conipher_cluster_info.build,
+    "wgs_alpaca": wgs_alpaca.build,
+    "wgs_alpaca_wgd_ratios": wgs_alpaca_wgd_ratios.build,
 }

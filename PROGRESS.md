@@ -32,8 +32,19 @@ canonical store + synthetic `nemo_mock/` for local dev. Downstream projects
   2026-10-28: segments come from the MSAI-adjusted consensus file (single-sample
   tumours: `_MSAI_NOT_adjusted_segments_tree_input.tsv`, flagged `msai_adjusted`), and
   `wgs_tree_clones` (ALPACA `tree_paths.json`) defines single-clone tumours
-  (`n_clones_tree = 1`). Pending: ALPACA output (integer clone CN), remaining
-  tree_input / alpaca input files.
+  (`n_clones_tree = 1`). Pending: remaining tree_input / alpaca input files.
+- **WGS WGD pipeline inputs** (2026-11-17, Piotr): `wgs_conipher_mutations` (SCoutput.CLEAN +
+  treeTable), `wgs_conipher_tree_edges` (default tree of allTrees.txt), `wgs_conipher_cluster_info`
+  (clusterInfo, CCF QC columns), all from the CONIPHER run `2026_08_mean_max_absent/runs/
+  cleaning_noisefloor_artefact/snv/<label>/` (alias `conipher_wgs`); `wgs_alpaca` and
+  `wgs_alpaca_wgd_ratios` from `wgs_resources/alpaca/output/tumour_results/<label>/` (parquet,
+  same format as WES). Mocks consistent with the WGS CN model (clusters = clones); ratio mock
+  from the real ALPACA `calculate_wgd_ratios`. Read by darwins_analysis `WGD_WGS_pipeline`.
+  The manual QC table is **not** a tx_data table: the WGS pipeline reads the WES file
+  (`tracerx/_RELEASE/release_tx842/_aggregate/20250729_tx842_manual_qc_complete_post_refphase.tsv`,
+  every WGS tumour is in the WES cohort) from its path; `nemo_mock/` has a minimal mock of it.
+  **TODO:** give that mock the real file's full column set (today: patient, tumour_id,
+  selected_solution, FINALIZED only).
 - **Path resolution**: every root in `_sources.yml` is an absolute `/nemo/...`
   path, re-rooted under `tx_data.paths.nemo_root()` (`TX_NEMO_ROOT` env var,
   then `config/paths.yml` `nemo_root:`, default `nemo_mock/`). `nemo_mock/`
@@ -74,6 +85,8 @@ canonical store + synthetic `nemo_mock/` for local dev. Downstream projects
 | Mock: PGDD outputs (WGD project) | ✅ mock only, no catalog/build yet | `scripts/generate_mock_pgdd.R`, `synthetic/pgdd/`, `nemo_mock/.../WGD/release_tx842/pgdd/` |
 | Catalog + build + mock: alpaca_wgd_ratios (`alpaca wgd`) | ✅ mock; real path confirmed (Piotr 2026-11-09) | `catalog/alpaca_wgd_ratios.yml`, `src/tx_data/builds/alpaca_wgd_ratios.py`, `scripts/generate_mock_alpaca_wgd.py` |
 | Catalog + build + mock: alpaca_corrected + alpaca_wgd_ratios_corrected (darwins_analysis `alpaca_post_hoc_correction`) | ✅ mock (no clone corrected with the placeholder wgd_calls); location passed at build time (`--source-dir` / `TX_ALPACA_CORRECTED_DIR`), nothing hardcoded (Piotr, 2026-11-13). TODO: realistic mocks (absent parents above parallel GDs, matching WGD calls) so the correction is exercised on the mock cohort | `catalog/alpaca_corrected.yml`, `catalog/alpaca_wgd_ratios_corrected.yml`, `src/tx_data/builds/alpaca_corrected.py`, `scripts/generate_mock_alpaca_corrected.py` |
+| Catalog + build + mock: wgs_conipher_mutations, wgs_conipher_tree_edges, wgs_conipher_cluster_info, wgs_alpaca, wgs_alpaca_wgd_ratios (WGS WGD pipeline) | ✅ mock; paths from Piotr 2026-11-17 | `catalog/wgs_*.yml`, `src/tx_data/builds/wgs_*.py`, `scripts/generate_mocks_wgs.py`, `scripts/generate_mock_alpaca_wgd.py` |
+| Mock: WES manual QC table (read by path by the WGS WGD pipeline, not a table) | ✅ minimal; TODO full column set | `nemo_mock/project/proj-tracerx-lung/tracerx/_RELEASE/release_tx842/_aggregate/` |
 | Tests | ✅ | `tests/test_pipeline.py` (6 passing) |
 
 ### PGDD / WGD notes (2026-11-06)

@@ -65,6 +65,10 @@ alt_source_roots:
   # optimal_solutions, results, tree_input (ignore intermediate, logs,
   # plots). Inventory path columns already point here.
   battenberg_wgs_output: /nemo/project/proj-tracerx-lung/tctProjects/CN-CCF/battenberg_wgs/output
+  # WGS CONIPHER run used by the WGD pipeline (Piotr, 2026-11-17): one folder per WGS tumour
+  # label holding SCoutput.CLEAN, treeTable, allTrees, clusterInfo (not the
+  # 2026_0721_updated_solutions run).
+  conipher_wgs: /nemo/project/proj-tracerx-wgs/working/grimesk/CONIPHERwgs/2026_08_mean_max_absent/runs/cleaning_noisefloor_artefact/snv
 
 sources:
   muttable:
@@ -464,3 +468,69 @@ sources:
       precomputed_ci.tsv, segments/, reports) are not imported yet;
       tree_paths.json is `wgs_tree_clones`. ALPACA output lives in alpaca/output (structure TBC).
 
+  wgs_conipher_mutations:
+    cohort: wgs
+    source_root: conipher_wgs
+    relative_path_pattern: "{wgs_tumour_label}/{wgs_tumour_label}.SCoutput.CLEAN.tsv"
+    relative_path_pattern_tree_table: "{wgs_tumour_label}/treeTable.tsv"
+    format: tsv
+    header: true
+    per_tumour: true
+    per_tumour_discovery: wgs_battenberg_inventory
+    tumour_id_form: "wgs_tumour_label (LTX0001 / LTX0002_tumour1)"
+    received: 2026-11-17
+    received_via: Piotr (Slack DM) supplied the run path and folder listing; shape as the WES CONIPHER output
+    notes: |
+      SCoutput.CLEAN.tsv (mutation x sample) joined with treeTable.tsv (mutation_id, SAMPLE,
+      treeCLUSTER) from the same folder. Input of WGD step 00 (WGD_WGS_pipeline).
+
+  wgs_conipher_tree_edges:
+    cohort: wgs
+    source_root: conipher_wgs
+    relative_path_pattern: "{wgs_tumour_label}/allTrees.txt"
+    format: text
+    per_tumour: true
+    per_tumour_discovery: wgs_battenberg_inventory
+    tumour_id_form: "wgs_tumour_label (LTX0001 / LTX0002_tumour1)"
+    received: 2026-11-17
+    received_via: Piotr (Slack DM), example path LTX0001/allTrees.txt
+    notes: |
+      Edges `parent<TAB>child` per tree, `# tree N` headers; the first tree is the default.
+
+  wgs_conipher_cluster_info:
+    cohort: wgs
+    source_root: conipher_wgs
+    relative_path_pattern: "{wgs_tumour_label}/clusterInfo.txt"
+    format: tsv
+    header: true
+    per_tumour: true
+    per_tumour_discovery: wgs_battenberg_inventory
+    tumour_id_form: "wgs_tumour_label (LTX0001 / LTX0002_tumour1)"
+    received: 2026-11-17
+    received_via: Piotr (Slack DM), example path LTX0001/clusterInfo.txt
+    notes: |
+      Only clusterID, SAMPLE, truncal, treeClust, meanCCF are kept (the WGD CCF QC).
+
+  wgs_alpaca:
+    cohort: wgs
+    relative_path_pattern: "alpaca/output/tumour_results/{wgs_tumour_label}/ALPACA_output_{wgs_tumour_label}.parquet"
+    format: parquet
+    per_tumour: true
+    per_tumour_discovery: wgs_battenberg_inventory
+    tumour_id_form: "wgs_tumour_label (LTX0001 / LTX0002_tumour1)"
+    received: 2026-11-17
+    received_via: Piotr (Slack DM), tumour_results listing; same format as WES ALPACA output
+    notes: |
+      Per-tumour ALPACA clone CN (tumour_id, segment, clone, pred_CN_A, pred_CN_B), as the WES
+      `all_tumours_combined.csv`. Layout: output/{all_solutions, cohort_results, reports,
+      single_clone_or_sample, tumour_results}.
+
+  wgs_alpaca_wgd_ratios:
+    cohort: wgs
+    relative_path_pattern: "alpaca/output/tumour_results/{wgs_tumour_label}/wgd_ratio_scores.parquet"
+    format: parquet
+    per_tumour: true
+    per_tumour_discovery: wgs_battenberg_inventory
+    tumour_id_form: "wgs_tumour_label (LTX0001 / LTX0002_tumour1)"
+    received: 2026-11-17
+    received_via: Piotr (Slack DM); same 12 columns as WES wgd_ratio_scores

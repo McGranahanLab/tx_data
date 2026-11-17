@@ -1,0 +1,102 @@
+# Catalog: wgs_conipher_mutations (WGS). Added 2026-11-17 for the WGS WGD pipeline.
+name: wgs_conipher_mutations
+cohort: wgs
+description: CONIPHER mutations of each WGS tumour (2026_08_mean_max_absent run), one row per mutation x sample,
+  with the tree cluster from treeTable.tsv. Input of the WGD pipeline's step 00 (PGDD input) through WGD_WGS_pipeline
+  (Piotr, 2026-11-17).
+provenance:
+  cohort: TRACERx WGS
+  hpc_source: /nemo/project/proj-tracerx-wgs/working/grimesk/CONIPHERwgs/2026_08_mean_max_absent/runs/cleaning_noisefloor_artefact/snv/<wgs_tumour_label>/<wgs_tumour_label>.SCoutput.CLEAN.tsv
+    (+ treeTable.tsv)
+  format_on_source: TSV, header row, one per tumour; same shape as the WES CONIPHER output
+  received: '2026-11-17'
+  received_via: 'Piotr (Slack DM): paths, folder listings; formats as WES'
+  canonical_format: Parquet (after build script)
+  consumer: darwins_analysis WGD_WGS_pipeline
+primary_key:
+- tumour_id
+- mutation_id
+- sample
+grain: one row per (WGS tumour x mutation x sample)
+columns:
+- name: tumour_id
+  type: VARCHAR
+  description: Canonical tumour ID (`LTX0001-Tumour1`), from the WGS inventory via the folder label.
+  null_semantics: not_applicable
+  derived: true
+- name: patient_id
+  type: VARCHAR
+  description: Patient ID (`LTX0001`).
+  null_semantics: not_applicable
+  derived: true
+- name: wgs_tumour_label
+  type: VARCHAR
+  description: Folder name (`LTX0001`, `LTX0104_tumour1`). For locating files only.
+  null_semantics: not_applicable
+  derived: true
+- name: sample
+  type: VARCHAR
+  description: Source `SAMPLE` verbatim (short form `LTX0001_SU_T1.R1`); equals the consensus segments' `sample`.
+  null_semantics: missing_on_source
+  derived: false
+- name: sample_name_hash
+  type: VARCHAR
+  description: Inventory sample name matched from `sample` within the tumour; null if unmatched.
+  null_semantics: missing_on_source
+  derived: true
+- name: chr
+  type: VARCHAR
+  description: Chromosome, no `chr` prefix (source CHR).
+  null_semantics: not_applicable
+  derived: false
+- name: pos
+  type: BIGINT
+  description: Position (source POS), hg38.
+  null_semantics: not_applicable
+  derived: false
+- name: ref
+  type: VARCHAR
+  description: Reference allele.
+  null_semantics: not_applicable
+  derived: false
+- name: alt
+  type: VARCHAR
+  description: Alternative allele.
+  null_semantics: not_applicable
+  derived: false
+- name: mutation_id
+  type: VARCHAR
+  description: CONIPHER mutation_id (key into treeTable).
+  null_semantics: not_applicable
+  derived: false
+- name: cluster
+  type: BIGINT
+  description: CONIPHER cluster (source CLUSTER), before tree building.
+  null_semantics: not_applicable
+  derived: false
+- name: tree_cluster
+  type: BIGINT
+  description: treeCLUSTER from treeTable.tsv for this mutation x sample; null when treeTable leaves it out (cluster
+    not on the tree).
+  null_semantics: missing_on_source
+  derived: false
+- name: mut_copy
+  type: DOUBLE
+  description: 'Mutation copy number (source MUT_COPY): ~2 means the mutation sits on a doubled chromosome.'
+  null_semantics: not_applicable
+  derived: false
+- name: cn_a
+  type: DOUBLE
+  description: Allele-specific copy number A at the locus (source COPY_NUMBER_A).
+  null_semantics: not_applicable
+  derived: false
+- name: cn_b
+  type: DOUBLE
+  description: Allele-specific copy number B at the locus (source COPY_NUMBER_B).
+  null_semantics: not_applicable
+  derived: false
+- name: ploidy
+  type: DOUBLE
+  description: Sample ploidy (source PLOIDY); null if the file has none.
+  null_semantics: missing_on_source
+  derived: false

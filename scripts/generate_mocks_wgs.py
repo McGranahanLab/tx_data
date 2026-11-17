@@ -38,6 +38,19 @@ Files written (mirrored /nemo paths under ``nemo_mock/``):
   - ``.../CN-CCF/wgs_resources/alpaca/input/<label>/cp_table.csv``
   - ``.../CN-CCF/wgs_resources/alpaca/input/<label>/tree_paths.json`` (ALPACA
     list-of-paths, trunk → leaf; every subclone is a child of clone1)
+  - CONIPHER (2026_08_mean_max_absent run, ``.../proj-tracerx-wgs/.../snv/<label>/``):
+    ``<label>.SCoutput.CLEAN.tsv``, ``treeTable.tsv``, ``allTrees.txt``, ``clusterInfo.txt``.
+    One cluster per clone (cluster n = clone n), 30 mutations each; truncal mutations sit on 2
+    copies in WGD-like tumours (ploidy >= 3); one off-tree cluster (9) in LTX0103 that treeTable
+    leaves out; LTX0104_tumour2's truncal meanCCF is 86 (fails the CCF QC).
+  - ALPACA output ``.../wgs_resources/alpaca/output/tumour_results/<label>/ALPACA_output_<label>.parquet``
+    (clone integer CN = the CN model's clone states on the autosomes, ALPACA's segment format being
+    digits only; WES `all_tumours_combined` columns).
+    ``wgd_ratio_scores.parquet`` next to it comes from the real ALPACA (generate_mock_alpaca_wgd.py).
+  - WES manual QC table (``tracerx/_RELEASE/release_tx842/_aggregate/20250729_tx842_manual_qc_complete_post_refphase.tsv``),
+    which the WGS WGD pipeline also reads (Piotr, 2026-11-17): every WES and WGS mock tumour, all
+    FINALIZED except LTX0105. Minimal columns (patient, tumour_id, selected_solution, FINALIZED);
+    TODO: match the real file's full column set.
   - ``_cohort_manifest_wgs.json`` (mock-only metadata, not part of the mirror)
 
 Deterministic (fixed seed) so mocks re-generate identically.
@@ -56,6 +69,12 @@ MOCK_CN_CCF = MOCK_DIR / "project" / "proj-tracerx-lung" / "tctProjects" / "CN-C
 INVENTORY = MOCK_CN_CCF / "wgs_resources" / "inventories" / "battenberg_output_inventory.tsv"
 MOCK_BATTENBERG_OUT = MOCK_CN_CCF / "battenberg_wgs" / "output"
 MOCK_ALPACA_INPUT = MOCK_CN_CCF / "wgs_resources" / "alpaca" / "input"
+MOCK_ALPACA_RESULTS = MOCK_CN_CCF / "wgs_resources" / "alpaca" / "output" / "tumour_results"
+MOCK_CONIPHER = (MOCK_DIR / "project" / "proj-tracerx-wgs" / "working" / "grimesk" / "CONIPHERwgs"
+                 / "2026_08_mean_max_absent" / "runs" / "cleaning_noisefloor_artefact" / "snv")
+MOCK_MANUAL_QC = (MOCK_DIR / "project" / "proj-tracerx-lung" / "tracerx" / "_RELEASE" / "release_tx842"
+                  / "_aggregate" / "20250729_tx842_manual_qc_complete_post_refphase.tsv")
+WES_MANIFEST = MOCK_DIR / "_cohort_manifest.json"
 
 # Real Nemo locations the inventory points at (kept as /nemo strings, as on source).
 BATTENBERG_OUT = "/nemo/project/proj-tracerx-lung/tctProjects/CN-CCF/battenberg_wgs/output"
@@ -65,6 +84,14 @@ SEED = 20261027
 RNG = random.Random(SEED)
 # Separate stream for copy number so CN changes never reshuffle sample hashes.
 CN_RNG = random.Random(SEED + 1)
+# Separate stream for the CONIPHER mutations, so adding them never changes the earlier mocks.
+MUT_RNG = random.Random(SEED + 2)
+CCF_QC_FAIL = {"LTX0104_tumour2": 86.0}     # truncal meanCCF below the 90% CCF QC cut-off
+UPSTREAM_QC_FAIL = {"LTX0105-Tumour1"}      # not FINALIZED in the manual QC table
+OFF_TREE_CLUSTER = {"LTX0103": 9}           # in SCoutput, dropped by treeTable
+N_MUTS_PER_CLUSTER = 30
+# label -> (segments, clone states, per-sample proportions, sample names, segment SAMPLE names)
+_CN_BY_LABEL: dict[str, tuple] = {}
 
 # hg38 chromosome lengths (bp).
 HG38_LENGTHS = {
@@ -327,6 +354,7 @@ def _write_cn(specs: list[WgsTumour], rows: list[dict]) -> dict[str, dict]:
         paths = [["clone1", c] for c in subs] or [["clone1"]]
         (MOCK_ALPACA_INPUT / label / "tree_paths.json").write_text(json.dumps(paths) + "\n")
 
+        _CN_BY_LABEL[label] = (segs, states, props, names, [_segments_source_name(n) for n in names])
         truth[label] = {
             "n_segments": len(segs),
             "segments_header": "legacy_A_B" if legacy else "major_minor",
@@ -339,11 +367,98 @@ def _write_cn(specs: list[WgsTumour], rows: list[dict]) -> dict[str, dict]:
     return truth
 
 
+def _write_conipher(specs: list[WgsTumour]) -> None:
+    """CONIPHER outputs per tumour, consistent with the CN model (clusters = clones)."""
+    for t in specs:
+        label = t.wgs_tumour_label
+        segs, states, props, names, seg_names = _CN_BY_LABEL[label]
+        clones = sorted(states, key=lambda c: int(c[5:]))
+        clusters = [int(c[5:]) for c in clones]
+        off = OFF_TREE_CLUSTER.get(label)
+        out = MOCK_CONIPHER / label
+        out.mkdir(parents=True, exist_ok=True)
+        cols = ("CASE_ID", "SAMPLE", "CHR", "POS", "REF", "ALT", "mutation_id", "CLUSTER", "VAF", "DEPTH",
+                "MUT_COPY", "COPY_NUMBER_A", "COPY_NUMBER_B", "PLOIDY", "PURITY")
+        scout, tree_rows = ["\t".join(cols)], ["\t".join(("mutation_id", "SAMPLE", "treeCLUSTER", "CCF"))]
+        for cl in clusters + ([off] if off else []):
+            clone = f"clone{cl}" if f"clone{cl}" in states else "clone1"
+            for _ in range(N_MUTS_PER_CLUSTER):
+                i = MUT_RNG.randrange(len(segs))
+                chrom, start, end = segs[i]
+                pos = MUT_RNG.randint(start, end)
+                ref, alt = MUT_RNG.sample("ACGT", 2)
+                mid = f"{label}:{chrom}:{pos}:{ref}:{alt}"
+                major, minor = states[clone][i]
+                for (sname, seg_name, cp), s in zip(zip(names, seg_names, props), t.samples):
+                    present = cp.get(clone, 0.0) > 0 or cl == 1 or cl == off
+                    doubled = cl == 1 and t.ploidy >= 3 and major >= 2
+                    mut_copy = (2.0 if doubled else 1.0) if present else 0.0
+                    depth = MUT_RNG.randint(40, 120)
+                    vaf = round(s.purity * mut_copy / max(major + minor, 1) * MUT_RNG.uniform(0.85, 1.15), 4)
+                    scout.append("\t".join(map(str, (label, seg_name, chrom, pos, ref, alt, mid, cl, vaf, depth,
+                                                       mut_copy, major, minor, t.ploidy, s.purity))))
+                    if cl != off:
+                        ccf = 100.0 if cl == 1 else round(100 * cp.get(clone, 0.0), 1)
+                        tree_rows.append(f"{mid}\t{seg_name}\t{cl}\t{ccf}")
+        (out / f"{label}.SCoutput.CLEAN.tsv").write_text("\n".join(scout) + "\n")
+        (out / "treeTable.tsv").write_text("\n".join(tree_rows) + "\n")
+        edges = [f"1\t{c}" for c in clusters[1:]] or ["1\t1"]          # single clone: CONIPHER writes 1 1
+        (out / "allTrees.txt").write_text("# tree 1\n" + "\n".join(edges) + "\n")
+        info = ["\t".join(("clusterID", "SAMPLE", "truncal", "treeClust", "meanCCF"))]
+        for cl in clusters + ([off] if off else []):
+            for seg_name, cp in zip(seg_names, props):
+                if cl == 1:
+                    ccf = CCF_QC_FAIL.get(label, 98.0)
+                elif cl == off:
+                    ccf = "NA"
+                else:
+                    ccf = round(100 * cp.get(f"clone{cl}", 0.0), 1)
+                tree = "NA" if cl == off else "TRUE"
+                info.append("\t".join(map(str, (cl, seg_name, "TRUE" if cl == 1 else "FALSE", tree, ccf))))
+        (out / "clusterInfo.txt").write_text("\n".join(info) + "\n")
+    print(f"wrote CONIPHER mocks (SCoutput, treeTable, allTrees, clusterInfo) for {len(specs)} tumours")
+
+
+def _write_alpaca_output(specs: list[WgsTumour]) -> None:
+    """ALPACA_output_<label>.parquet: integer clone CN per segment (the CN model's clone states)."""
+    import polars as pl
+
+    for t in specs:
+        label = t.wgs_tumour_label
+        segs, states, *_ = _CN_BY_LABEL[label]
+        rows = [{"tumour_id": t.tumour_id_canonical, "segment": f"{chrom}_{start}_{end}", "clone": c,
+                 "pred_CN_A": a, "pred_CN_B": b}
+                for c, st in states.items() for (chrom, start, end), (a, b) in zip(segs, st)
+                if chrom != "X"]     # ALPACA's segment format is digits only (calculate_wgd_ratios)
+        out = MOCK_ALPACA_RESULTS / label / f"ALPACA_output_{label}.parquet"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        pl.DataFrame(rows).write_parquet(out)
+    print(f"wrote ALPACA_output parquet for {len(specs)} tumours")
+
+
+def _write_manual_qc(specs: list[WgsTumour]) -> None:
+    """WES manual QC table mock covering WES + WGS mock tumours (minimal columns; TODO: real column set)."""
+    tumours = {(t.patient_id, t.tumour_ordinal) for t in specs}
+    if WES_MANIFEST.is_file():
+        for w in json.loads(WES_MANIFEST.read_text())["tumours"]:
+            tumours.add((w["patient_id"], w["tumour_ordinal"]))
+    lines = ["patient\ttumour_id\tselected_solution\tFINALIZED"]
+    for patient, n in sorted(tumours):
+        fin = "FALSE" if f"{patient}-Tumour{n}" in UPSTREAM_QC_FAIL else "TRUE"
+        lines.append(f"{patient}\t{n}\tTRUE\t{fin}")
+    MOCK_MANUAL_QC.parent.mkdir(parents=True, exist_ok=True)
+    MOCK_MANUAL_QC.write_text("\n".join(lines) + "\n")
+    print(f"wrote manual QC mock ({len(tumours)} tumours)")
+
+
 def main() -> None:
     specs = cohort()
     rows = _write_inventory(specs)
     truth = _write_cn(specs, rows)
     _write_manifest(specs, rows, truth)
+    _write_conipher(specs)
+    _write_alpaca_output(specs)
+    _write_manual_qc(specs)
 
 
 if __name__ == "__main__":
