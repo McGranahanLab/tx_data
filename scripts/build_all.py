@@ -6,12 +6,18 @@ mock build, the timestamp, per-table cohort (wes / wgs / reference) and
 per-table row counts. Downstream consumers (e.g.
 mut_essential_wgd/run_analysis.py) read this to prove which cohort a
 given set of parquets came from.
+
+The build is resilient: a builder that raises is logged, recorded in the
+manifest under ``failed_tables``, and the pipeline continues with the
+remaining builders. A human-readable summary is also written to
+``data/_build_report.txt`` so missing inputs are easy to spot.
 """
 from __future__ import annotations
 
 import argparse
 import json
 import os
+import traceback
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -56,6 +62,15 @@ TABLES = (
     "wgs_alpaca_wgd_ratios",
 )
 
+# Extra parquet names a builder may emit in addition to `<table>.parquet`.
+# Used both for row-count discovery and for reporting "expected but missing"
+# outputs when a build silently produces a subset.
+EXTRA_OUTPUTS: dict[str, tuple[str, ...]] = {
+    "clinical": ("clinical_per_tumour",),
+    "kallisto": ("kallisto_paired_normals",),
+    "conipher_trees": ("conipher_ccf", "conipher_clonality"),
+}
+
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -75,38 +90,106 @@ def _apply_build_mode(mode: str | None) -> None:
     os.environ["TX_NEMO_ROOT"] = str(root)
 
 
+def _primary_output(name: str) -> str:
+    """Primary parquet basename — same as table name except for conipher_trees."""
+    if name == "conipher_trees":
+        # conipher_trees has no file literally named conipher_trees.parquet;
+        # treat conipher_ccf as the primary for presence checks.
+        return "conipher_ccf"
+    return name
+
+
+def _expected_outputs(name: str) -> tuple[str, ...]:
+    """All parquet basenames a builder is expected to produce."""
+    if name == "conipher_trees":
+        return EXTRA_OUTPUTS[name]
+    return (name,) + EXTRA_OUTPUTS.get(name, ())
+
+
+def _collect_row_counts(
+    data_dir: Path, failures: dict[str, dict[str, str]]
+) -> dict[str, int]:
+    """Row counts for every parquet produced *this run*.
+
+    Skips any table listed in ``failures`` so that a stale parquet from a
+    previous successful run is not reported as if freshly rebuilt.
+    """
+    row_counts: dict[str, int] = {}
+    for name in TABLES:
+        if name in failures:
+            continue
+        for sub in _expected_outputs(name):
+            p = data_dir / f"{sub}.parquet"
+            if p.is_file():
+                row_counts[sub] = pl.read_parquet(p).height
+    return row_counts
+
+
+def _missing_outputs(data_dir: Path, name: str) -> list[str]:
+    return [
+        sub for sub in _expected_outputs(name)
+        if not (data_dir / f"{sub}.parquet").is_file()
+    ]
+
+
+def _write_report(
+    data_dir: Path,
+    manifest: dict,
+    failures: dict[str, dict[str, str]],
+    log_fn,
+) -> None:
+    lines = []
+    lines.append("tx_data build report")
+    lines.append(f"built_at_utc: {manifest['built_at_utc']}")
+    lines.append(f"nemo_root:    {manifest['nemo_root']}")
+    lines.append(f"data_root:    {manifest['data_root']}")
+    lines.append(f"is_mock:      {manifest['data_root_is_mock']}")
+    lines.append("")
+
+    lines.append("Per-table status:")
+    row_counts = manifest["table_row_counts"]
+    for name in TABLES:
+        missing = _missing_outputs(data_dir, name)
+        if name in failures:
+            f = failures[name]
+            lines.append(
+                f"  FAIL    {name:<28} {f['error_type']}: {f['message']}"
+            )
+        elif missing:
+            lines.append(
+                f"  MISSING {name:<28} no output parquet(s): {', '.join(missing)}"
+            )
+        else:
+            rows = row_counts.get(_primary_output(name), 0)
+            extras = [
+                f"{sub}={row_counts.get(sub, 0)}"
+                for sub in EXTRA_OUTPUTS.get(name, ())
+                if sub in row_counts
+            ]
+            extra_str = f"  [{', '.join(extras)}]" if extras else ""
+            lines.append(f"  OK      {name:<28} rows={rows}{extra_str}")
+
+    if failures:
+        lines.append("")
+        lines.append("Failures (with tracebacks):")
+        for name, f in failures.items():
+            lines.append(f"  - {name}: {f['error_type']}: {f['message']}")
+            for tb_line in f["traceback"].rstrip().splitlines():
+                lines.append(f"      {tb_line}")
+
+    report_path = data_dir / "_build_report.txt"
+    report_path.write_text("\n".join(lines) + "\n")
+    log_fn(f"wrote {report_path}")
+
+
 def _write_manifest(
     data_dir: Path,
     data_root_fn,
     data_root_is_mock_fn,
+    failures: dict[str, dict[str, str]],
     log_fn,
-) -> None:
-    row_counts: dict[str, int] = {}
-    for name in TABLES:
-        p = data_dir / f"{name}.parquet"
-        if p.is_file():
-            row_counts[name] = pl.read_parquet(p).height
-        # clinical builder additionally emits clinical_per_tumour; capture it.
-        if name == "clinical":
-            p2 = data_dir / "clinical_per_tumour.parquet"
-            if p2.is_file():
-                row_counts["clinical_per_tumour"] = pl.read_parquet(p2).height
-        # kallisto builder additionally emits kallisto_paired_normals.
-        if name == "kallisto":
-            p2 = data_dir / "kallisto_paired_normals.parquet"
-            if p2.is_file():
-                row_counts["kallisto_paired_normals"] = pl.read_parquet(p2).height
-        # alpaca_corrected builder also emits alpaca_wgd_ratios_corrected.
-        if name == "alpaca_corrected":
-            p2 = data_dir / "alpaca_wgd_ratios_corrected.parquet"
-            if p2.is_file():
-                row_counts["alpaca_wgd_ratios_corrected"] = pl.read_parquet(p2).height
-        # conipher_trees builder emits two parquets, neither named after the table.
-        if name == "conipher_trees":
-            for sub in ("conipher_ccf", "conipher_clonality"):
-                p2 = data_dir / f"{sub}.parquet"
-                if p2.is_file():
-                    row_counts[sub] = pl.read_parquet(p2).height
+) -> dict:
+    row_counts = _collect_row_counts(data_dir, failures)
 
     from tx_data.catalog import load_catalog
     from tx_data.paths import nemo_root
@@ -119,6 +202,10 @@ def _write_manifest(
         "env_TX_NEMO_ROOT": os.environ.get("TX_NEMO_ROOT"),
         "table_cohorts": {name: load_catalog(name)["cohort"] for name in TABLES},
         "table_row_counts": row_counts,
+        "failed_tables": {
+            name: {"error_type": f["error_type"], "message": f["message"]}
+            for name, f in failures.items()
+        },
     }
     manifest_path = data_dir / "_build_manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
@@ -128,6 +215,7 @@ def _write_manifest(
         f"is_mock={manifest['data_root_is_mock']} "
         f"tables={row_counts}"
     )
+    return manifest
 
 
 if __name__ == "__main__":
@@ -138,6 +226,29 @@ if __name__ == "__main__":
     from tx_data.builds._base import DATA_DIR, log
     from tx_data.paths import data_root, data_root_is_mock
 
+    failures: dict[str, dict[str, str]] = {}
     for name in TABLES:
-        BUILDERS[name]()
-    _write_manifest(DATA_DIR, data_root, data_root_is_mock, log)
+        try:
+            BUILDERS[name]()
+        except Exception as e:
+            tb = traceback.format_exc()
+            failures[name] = {
+                "error_type": type(e).__name__,
+                "message": str(e),
+                "traceback": tb,
+            }
+            log(f"FAILED {name}: {type(e).__name__}: {e}")
+
+    manifest = _write_manifest(
+        DATA_DIR, data_root, data_root_is_mock, failures, log,
+    )
+    _write_report(DATA_DIR, manifest, failures, log)
+
+    if failures:
+        log(
+            f"build finished with {len(failures)} failure(s): "
+            f"{', '.join(sorted(failures))}. "
+            f"See {DATA_DIR / '_build_report.txt'} for details."
+        )
+    else:
+        log("build finished with all tables succeeded.")
