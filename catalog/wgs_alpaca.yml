@@ -1,0 +1,94 @@
+# Catalog: wgs_alpaca (WGS). Added 2026-11-17 for the WGS WGD pipeline.
+name: wgs_alpaca
+cohort: wgs
+description: 'ALPACA clone copy number for the WGS cohort: per tumour x segment x clone allele-specific integer
+  CN, same columns and derived fields as `alpaca` (WES).'
+provenance:
+  cohort: TRACERx WGS
+  hpc_source: /nemo/project/proj-tracerx-lung/tctProjects/CN-CCF/wgs_resources/alpaca/output/tumour_results/<wgs_tumour_label>/ALPACA_output_<wgs_tumour_label>.parquet
+  format_on_source: Parquet, one per tumour; columns as WES all_tumours_combined.csv
+  received: '2026-11-17'
+  received_via: 'Piotr (Slack DM): paths, folder listings; formats as WES'
+  canonical_format: Parquet (after build script)
+  consumer: darwins_analysis WGD_WGS_pipeline
+primary_key:
+- tumour_id
+- segment
+- clone
+grain: one row per (WGS tumour x segment x clone)
+columns:
+- name: tumour_id
+  type: VARCHAR
+  description: Canonical tumour ID (`LTX0001-Tumour1`), from the WGS inventory via the folder label.
+  null_semantics: not_applicable
+  derived: true
+- name: patient_id
+  type: VARCHAR
+  description: Patient ID (`LTX0001`).
+  null_semantics: not_applicable
+  derived: true
+- name: wgs_tumour_label
+  type: VARCHAR
+  description: Folder name (`LTX0001`, `LTX0104_tumour1`). For locating files only.
+  null_semantics: not_applicable
+  derived: true
+- name: segment
+  type: VARCHAR
+  description: '`<chr>_<start>_<end>` verbatim (digits-only chromosome, as ALPACA requires).'
+  null_semantics: not_applicable
+  derived: false
+- name: clone
+  type: VARCHAR
+  description: Clone ID (`clone1`).
+  null_semantics: not_applicable
+  derived: false
+- name: pred_CN_A
+  type: BIGINT
+  description: Allele A integer CN.
+  null_semantics: not_applicable
+  derived: false
+- name: pred_CN_B
+  type: BIGINT
+  description: Allele B integer CN.
+  null_semantics: not_applicable
+  derived: false
+- name: segment_chr
+  type: VARCHAR
+  description: Chromosome parsed from `segment`.
+  null_semantics: not_applicable
+  derived: true
+- name: segment_start
+  type: BIGINT
+  description: Start parsed from `segment`.
+  null_semantics: not_applicable
+  derived: true
+- name: segment_end
+  type: BIGINT
+  description: End parsed from `segment`.
+  null_semantics: not_applicable
+  derived: true
+- name: total_cn
+  type: BIGINT
+  description: pred_CN_A + pred_CN_B.
+  null_semantics: not_applicable
+  derived: true
+- name: minor_cn
+  type: BIGINT
+  description: min(A, B).
+  null_semantics: not_applicable
+  derived: true
+- name: major_cn
+  type: BIGINT
+  description: max(A, B).
+  null_semantics: not_applicable
+  derived: true
+- name: is_homdel
+  type: BOOLEAN
+  description: Both alleles 0.
+  null_semantics: not_applicable
+  derived: true
+- name: is_loh
+  type: BOOLEAN
+  description: Minor 0, total > 0.
+  null_semantics: not_applicable
+  derived: true

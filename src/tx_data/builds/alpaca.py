@@ -19,24 +19,8 @@ from tx_data.sources import resolve_source
 TABLE = "alpaca"
 
 
-def build() -> pl.DataFrame:
-    src = resolve_source(TABLE)
-    log(f"read {src}")
-
-    df = pl.read_csv(
-        src,
-        separator=",",
-        null_values=["NA", ""],
-        infer_schema_length=10000,
-        schema_overrides={
-            "tumour_id": pl.String,
-            "segment": pl.String,
-            "clone": pl.String,
-            "pred_CN_A": pl.Int64,
-            "pred_CN_B": pl.Int64,
-        },
-    )
-
+def derive(df: pl.DataFrame) -> pl.DataFrame:
+    """Parse `segment` and add the derived CN columns (shared with `wgs_alpaca`)."""
     # Parse `segment` = "<chr>_<start>_<end>".
     seg_parts = pl.col("segment").str.split_exact("_", 2).struct.rename_fields(
         ["segment_chr", "segment_start_s", "segment_end_s"]
@@ -65,6 +49,28 @@ def build() -> pl.DataFrame:
             ((pl.col("minor_cn") == 0) & (pl.col("total_cn") > 0)).alias("is_loh"),
         ]
     )
+    return df
+
+
+def build() -> pl.DataFrame:
+    src = resolve_source(TABLE)
+    log(f"read {src}")
+
+    df = pl.read_csv(
+        src,
+        separator=",",
+        null_values=["NA", ""],
+        infer_schema_length=10000,
+        schema_overrides={
+            "tumour_id": pl.String,
+            "segment": pl.String,
+            "clone": pl.String,
+            "pred_CN_A": pl.Int64,
+            "pred_CN_B": pl.Int64,
+        },
+    )
+
+    df = derive(df)
 
     out = canonical_output_path(TABLE)
     df.write_parquet(out)

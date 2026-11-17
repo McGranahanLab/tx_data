@@ -1,0 +1,94 @@
+# Catalog: wgs_alpaca_wgd_ratios (WGS). Added 2026-11-17 for the WGS WGD pipeline.
+name: wgs_alpaca_wgd_ratios
+cohort: wgs
+description: 'ALPACA per-clone WGD ratios (`alpaca wgd`, calculate_wgd_ratios) for the WGS cohort: the tree (clone
+  -> parent) and the length-weighted mean of clone/parent CN per allele and in total. Same columns as `alpaca_wgd_ratios`
+  (WES).'
+provenance:
+  cohort: TRACERx WGS
+  hpc_source: /nemo/project/proj-tracerx-lung/tctProjects/CN-CCF/wgs_resources/alpaca/output/tumour_results/<wgs_tumour_label>/wgd_ratio_scores.parquet
+  format_on_source: Parquet, one per tumour; the 12-column wgd_ratio_scores format
+  received: '2026-11-17'
+  received_via: 'Piotr (Slack DM): paths, folder listings; formats as WES'
+  canonical_format: Parquet (after build script)
+  consumer: darwins_analysis WGD_WGS_pipeline
+primary_key:
+- tumour_id
+- clone
+grain: one row per (WGS tumour x clone)
+columns:
+- name: tumour_id
+  type: VARCHAR
+  description: Canonical tumour ID (`LTX0001-Tumour1`), from the WGS inventory via the folder label.
+  null_semantics: not_applicable
+  derived: true
+- name: patient_id
+  type: VARCHAR
+  description: Patient ID (`LTX0001`).
+  null_semantics: not_applicable
+  derived: true
+- name: wgs_tumour_label
+  type: VARCHAR
+  description: Folder name (`LTX0001`, `LTX0104_tumour1`). For locating files only.
+  null_semantics: not_applicable
+  derived: true
+- name: clone
+  type: VARCHAR
+  description: Clone ID.
+  null_semantics: not_applicable
+  derived: false
+- name: parent
+  type: VARCHAR
+  description: Parent clone; `diploid` for the MRCA.
+  null_semantics: not_applicable
+  derived: false
+- name: ratio_A
+  type: DOUBLE
+  description: Length-weighted mean clone/parent CN, A; null if no usable segment.
+  null_semantics: missing_on_source
+  derived: false
+- name: ratio_B
+  type: DOUBLE
+  description: Length-weighted mean clone/parent CN, B; null if no usable segment.
+  null_semantics: missing_on_source
+  derived: false
+- name: ratio_total
+  type: DOUBLE
+  description: Length-weighted mean clone/parent CN, total; null if no usable segment.
+  null_semantics: missing_on_source
+  derived: false
+- name: segments_used_A
+  type: BIGINT
+  description: Segments used for ratio_A (parent CN > 0).
+  null_semantics: not_applicable
+  derived: false
+- name: segments_used_B
+  type: BIGINT
+  description: Segments used for ratio_B (parent CN > 0).
+  null_semantics: not_applicable
+  derived: false
+- name: segments_used_total
+  type: BIGINT
+  description: Segments used for ratio_total (parent CN > 0).
+  null_semantics: not_applicable
+  derived: false
+- name: weight_sum_A
+  type: DOUBLE
+  description: Summed segment length behind ratio_A.
+  null_semantics: not_applicable
+  derived: false
+- name: weight_sum_B
+  type: DOUBLE
+  description: Summed segment length behind ratio_B.
+  null_semantics: not_applicable
+  derived: false
+- name: weight_sum_total
+  type: DOUBLE
+  description: Summed segment length behind ratio_total.
+  null_semantics: not_applicable
+  derived: false
+- name: is_mrca
+  type: BOOLEAN
+  description: parent = diploid.
+  null_semantics: not_applicable
+  derived: true

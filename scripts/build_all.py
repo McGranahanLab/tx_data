@@ -48,6 +48,12 @@ TABLES = (
     "wgs_consensus_segments",
     "wgs_clone_proportions",
     "wgs_tree_clones",
+    # CONIPHER (2026_08_mean_max_absent run) and ALPACA output for the WGS WGD pipeline
+    "wgs_conipher_mutations",
+    "wgs_conipher_tree_edges",
+    "wgs_conipher_cluster_info",
+    "wgs_alpaca",
+    "wgs_alpaca_wgd_ratios",
 )
 
 

@@ -1,0 +1,2 @@
+clusterID	SAMPLE	truncal	treeClust	meanCCF
+1	LTX0105_SU_T1.R1	TRUE	TRUE	98.0

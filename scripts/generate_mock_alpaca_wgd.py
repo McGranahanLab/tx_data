@@ -49,6 +49,11 @@ OUT_NAME = "wgd_ratio_scores.csv"
 
 ALPACA_SRC = Path(os.environ.get("ALPACA_SRC", "/tmp/alpaca_model"))
 
+# WGS (2026-11-17): per-tumour ALPACA_output_<label>.parquet (generate_mocks_wgs.py) + the
+# tumour's alpaca/input/<label>/tree_paths.json -> wgd_ratio_scores.parquet next to the CN file.
+WGS_ALPACA = REPO_ROOT / "nemo_mock" / "project" / "proj-tracerx-lung" / "tctProjects" / "CN-CCF" / "wgs_resources" / "alpaca"
+WGS_MANIFEST = REPO_ROOT / "nemo_mock" / "_cohort_manifest_wgs.json"
+
 
 def _import_alpaca():
     if not (ALPACA_SRC / "alpaca" / "analysis.py").is_file():
@@ -108,6 +113,23 @@ def main() -> None:
             n += 1
             print(f"wrote {OUT_ROOT / tid / OUT_NAME} ({len(ratios)} clones)")
     print(f"done: {n} tumours")
+    wgs(calculate_wgd_ratios)
+
+
+def wgs(calculate_wgd_ratios) -> None:
+    """Same for the WGS mock; ALPACA writes parquet there (Piotr, 2026-11-17)."""
+    import pandas as pd
+
+    labels = [t["wgs_tumour_label"] for t in json.loads(WGS_MANIFEST.read_text())["tumours"]]
+    with tempfile.TemporaryDirectory() as tmp:
+        for label in labels:
+            out_dir = WGS_ALPACA / "output" / "tumour_results" / label
+            cn_path = Path(tmp) / f"{label}_alpaca_output.csv"
+            pd.read_parquet(out_dir / f"ALPACA_output_{label}.parquet").to_csv(cn_path, index=False)
+            ratios = calculate_wgd_ratios(results_path=str(cn_path),
+                                          tree_path=str(WGS_ALPACA / "input" / label / "tree_paths.json"))
+            ratios.to_parquet(out_dir / "wgd_ratio_scores.parquet", index=False)
+            print(f"wrote {out_dir / 'wgd_ratio_scores.parquet'} ({len(ratios)} clones)")
 
 
 if __name__ == "__main__":
