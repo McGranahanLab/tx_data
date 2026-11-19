@@ -26,6 +26,7 @@ from tx_data.builds import (
     wgs_conipher_cluster_info,
     wgs_alpaca,
     wgs_alpaca_wgd_ratios,
+    wgs_wgd_calls,
 )
 
 __all__ = [
@@ -54,6 +55,7 @@ __all__ = [
     "wgs_conipher_cluster_info",
     "wgs_alpaca",
     "wgs_alpaca_wgd_ratios",
+    "wgs_wgd_calls",
 ]
 
 BUILDERS = {
@@ -82,4 +84,5 @@ BUILDERS = {
     "wgs_conipher_cluster_info": wgs_conipher_cluster_info.build,
     "wgs_alpaca": wgs_alpaca.build,
     "wgs_alpaca_wgd_ratios": wgs_alpaca_wgd_ratios.build,
+    "wgs_wgd_calls": wgs_wgd_calls.build,
 }
