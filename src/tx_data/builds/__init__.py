@@ -26,6 +26,10 @@ from tx_data.builds import (
     wgs_conipher_cluster_info,
     wgs_alpaca,
     wgs_alpaca_wgd_ratios,
+    alpaca_trees,
+    wgs_alpaca_trees,
+    cohort_metadata,
+    chr_table,
 )
 
 __all__ = [
@@ -54,6 +58,10 @@ __all__ = [
     "wgs_conipher_cluster_info",
     "wgs_alpaca",
     "wgs_alpaca_wgd_ratios",
+    "alpaca_trees",
+    "wgs_alpaca_trees",
+    "cohort_metadata",
+    "chr_table",
 ]
 
 BUILDERS = {
@@ -82,4 +90,8 @@ BUILDERS = {
     "wgs_conipher_cluster_info": wgs_conipher_cluster_info.build,
     "wgs_alpaca": wgs_alpaca.build,
     "wgs_alpaca_wgd_ratios": wgs_alpaca_wgd_ratios.build,
+    "alpaca_trees": alpaca_trees.build,
+    "wgs_alpaca_trees": wgs_alpaca_trees.build,
+    "cohort_metadata": cohort_metadata.build,
+    "chr_table": chr_table.build,
 }

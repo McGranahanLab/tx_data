@@ -1,0 +1,28 @@
+# Catalog: alpaca_trees. Added 2026-11-19.
+name: alpaca_trees
+cohort: wes
+description: 'Phylogenetic tree of each WES tumour: one row per clone, child -> parent. Trees are ALPACA''s input
+  trees (tree_paths.json), NOT CONIPHER output: CONIPHER writes several alternative trees and the optimal one is
+  selected (by various methods) before ALPACA, so ALPACA''s input holds the selected tree (Piotr, 2026-11-19).'
+provenance:
+  cohort: TRACERx 842 (Tx842)
+  hpc_source: /nemo/project/proj-tracerx-lung/tctProjects/lungTx/Tx842/release/tracerx_842/ALPACA/input/<tumour_id>/tree_paths.json
+  hpc_source_status: Location assumed next to cp_table.csv (2026-11-19); to confirm on Nemo.
+  format_on_source: JSON list of trunk -> leaf clone paths, one file per tumour
+  received: '2026-11-19'
+  canonical_format: Parquet (after build script)
+  pipeline: CONIPHER (alternative trees) -> tree selection -> ALPACA input
+primary_key:
+- tumour_id
+- child
+grain: one row per (WES tumour x clone)
+columns:
+- name: tumour_id
+  type: VARCHAR
+  description: Canonical tumour ID (`LTX0001-Tumour1`).
+- name: child
+  type: VARCHAR
+  description: Clone ID (`clone1`), as in ALPACA and cp_table.
+- name: parent
+  type: VARCHAR
+  description: Parent clone; `diploid` for the MRCA (as in wgd_ratio_scores).

@@ -1,0 +1,30 @@
+# Catalog: cohort_metadata. Added 2026-11-19.
+name: cohort_metadata
+cohort: reference
+description: 'Cohort-wide facts, one row per (cohort x field): genome build (WES hg19, WGS hg38), assay, sample
+  design, id forms, where trees / CN / WGD calls come from, chromosome-length table to use. Source: references/cohorts/cohort_metadata.yml
+  (edit there).'
+provenance:
+  cohort: WES + WGS
+  hpc_source: ''
+  format_on_source: YAML in tx_data (references/cohorts/cohort_metadata.yml)
+  received: '2026-11-19'
+  received_via: Piotr (Slack DM)
+  canonical_format: Parquet (after build script)
+primary_key:
+- cohort
+- field
+grain: one row per (cohort x field)
+columns:
+- name: cohort
+  type: VARCHAR
+  description: '`wes` or `wgs` (as `cohort:` in the catalog).'
+- name: field
+  type: VARCHAR
+  description: e.g. genome_build, assay, samples, trees, clone_copy_number, wgd_calls.
+- name: value
+  type: VARCHAR
+  description: The fact, as text.
+- name: note
+  type: VARCHAR
+  description: Caveat for the field (from `<field>_note` in the YAML); null if none.

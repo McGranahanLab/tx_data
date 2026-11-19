@@ -60,6 +60,12 @@ TABLES = (
     "wgs_conipher_cluster_info",
     "wgs_alpaca",
     "wgs_alpaca_wgd_ratios",
+    # trees (ALPACA input), cohort facts, chromosome lengths (2026-11-19)
+    "alpaca_trees",
+    "wgs_alpaca_trees",
+    "cohort_metadata",
+    # chr_table emits TWO parquets (chr_table_hg19, chr_table_hg38)
+    "chr_table",
 )
 
 # Extra parquet names a builder may emit in addition to `<table>.parquet`.
@@ -69,7 +75,10 @@ EXTRA_OUTPUTS: dict[str, tuple[str, ...]] = {
     "clinical": ("clinical_per_tumour",),
     "kallisto": ("kallisto_paired_normals",),
     "conipher_trees": ("conipher_ccf", "conipher_clonality"),
+    "chr_table": ("chr_table_hg19", "chr_table_hg38"),
 }
+# Builders with no parquet named after them: their primary output.
+PRIMARY_OUTPUT = {"conipher_trees": "conipher_ccf", "chr_table": "chr_table_hg19"}
 
 
 def _parse_args() -> argparse.Namespace:
@@ -92,16 +101,13 @@ def _apply_build_mode(mode: str | None) -> None:
 
 def _primary_output(name: str) -> str:
     """Primary parquet basename — same as table name except for conipher_trees."""
-    if name == "conipher_trees":
-        # conipher_trees has no file literally named conipher_trees.parquet;
-        # treat conipher_ccf as the primary for presence checks.
-        return "conipher_ccf"
-    return name
+    # conipher_trees / chr_table have no file named after the builder; use their primary output.
+    return PRIMARY_OUTPUT.get(name, name)
 
 
 def _expected_outputs(name: str) -> tuple[str, ...]:
     """All parquet basenames a builder is expected to produce."""
-    if name == "conipher_trees":
+    if name in PRIMARY_OUTPUT:
         return EXTRA_OUTPUTS[name]
     return (name,) + EXTRA_OUTPUTS.get(name, ())
 
@@ -200,7 +206,8 @@ def _write_manifest(
         "data_root": str(data_root_fn()),
         "data_root_is_mock": data_root_is_mock_fn(),
         "env_TX_NEMO_ROOT": os.environ.get("TX_NEMO_ROOT"),
-        "table_cohorts": {name: load_catalog(name)["cohort"] for name in TABLES},
+        "table_cohorts": {name: load_catalog(name if name != "chr_table" else PRIMARY_OUTPUT[name])["cohort"]
+                          for name in TABLES},
         "table_row_counts": row_counts,
         "failed_tables": {
             name: {"error_type": f["error_type"], "message": f["message"]}

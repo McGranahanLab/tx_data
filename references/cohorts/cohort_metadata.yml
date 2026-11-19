@@ -1,0 +1,31 @@
+# Cohort metadata (Piotr, 2026-11-19): facts that hold for a whole cohort, so analyses don't have to
+# guess them (genome build first). Built into the `cohort_metadata` table (cohort, field, value, note).
+# Keep `genome_build` in step with catalog/_sources.yml `cohorts:` (a test checks).
+wes:
+  name: TRACERx 842 (Tx842)
+  assay: multi-region whole-exome sequencing (WES)
+  genome_build: hg19
+  genome_build_note: moving to hg38 (Piotr, 2026-10-27)
+  samples: multi-region, several samples per tumour
+  tumour_id_form: LTX0001-Tumour1 (canonical in every tx_data table)
+  source_root: /nemo/project/proj-tracerx-lung/tctProjects/lungTx/Tx842/release/tracerx_842
+  trees: ALPACA input tree_paths.json (alpaca_trees); CONIPHER gives several alternative trees, the optimal one is selected before ALPACA
+  clone_copy_number: ALPACA (alpaca, ALPACA/output/cohort_results/all_tumours_combined.csv)
+  wgd_calls: previous release table WGD/release_tx842/WGD_calls.tsv (wgd_calls); a WES WGD pipeline is TODO
+  manual_qc_table: /nemo/project/proj-tracerx-lung/tracerx/_RELEASE/release_tx842/_aggregate/20250729_tx842_manual_qc_complete_post_refphase.tsv
+  chromosome_lengths: chr_table_hg19
+wgs:
+  name: TRACERx WGS
+  assay: whole-genome sequencing (WGS)
+  genome_build: hg38
+  samples: mostly single-sample tumours; some multi-region
+  tumour_id_form: LTX0001-Tumour1 canonical; folders use the label LTX0001 (single-tumour patient) or LTX0002_tumour1 (multi-tumour patient)
+  source_root: /nemo/project/proj-tracerx-lung/tctProjects/CN-CCF/wgs_resources
+  copy_number: Battenberg (optimal solution per sample) with MSAI-adjusted consensus segments; single-sample tumours use the NOT adjusted file
+  conipher_run: /nemo/project/proj-tracerx-wgs/working/grimesk/CONIPHERwgs/2026_08_mean_max_absent/runs/cleaning_noisefloor_artefact/snv
+  trees: ALPACA input tree_paths.json (wgs_alpaca_trees); not CONIPHER's alternative trees
+  clone_copy_number: ALPACA (wgs_alpaca, alpaca/output/tumour_results/<label>/)
+  wgd_calls: darwins_analysis WGD_WGS_pipeline (wgs_wgd_calls)
+  pgdd_thresholds: WGS-scale, discover_num_muts 100, discover_num_2_cpn_muts 50, check_num_2_cpn_muts 30 (Piotr, 2026-11-19)
+  manual_qc_table: the WES table (every WGS tumour is in the WES cohort)
+  chromosome_lengths: chr_table_hg38
