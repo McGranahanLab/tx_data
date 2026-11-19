@@ -30,6 +30,7 @@ from tx_data.builds import (
     wgs_alpaca_trees,
     cohort_metadata,
     chr_table,
+    wgs_wgd_calls,
 )
 
 __all__ = [
@@ -62,6 +63,7 @@ __all__ = [
     "wgs_alpaca_trees",
     "cohort_metadata",
     "chr_table",
+    "wgs_wgd_calls",
 ]
 
 BUILDERS = {
@@ -94,4 +96,5 @@ BUILDERS = {
     "wgs_alpaca_trees": wgs_alpaca_trees.build,
     "cohort_metadata": cohort_metadata.build,
     "chr_table": chr_table.build,
+    "wgs_wgd_calls": wgs_wgd_calls.build,
 }

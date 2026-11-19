@@ -66,6 +66,8 @@ TABLES = (
     "cohort_metadata",
     # chr_table emits TWO parquets (chr_table_hg19, chr_table_hg38)
     "chr_table",
+    # WGD_WGS_pipeline output; location from TX_WGS_WGD_CALLS_DIR (else the mock)
+    "wgs_wgd_calls",
 )
 
 # Extra parquet names a builder may emit in addition to `<table>.parquet`.

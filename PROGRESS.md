@@ -89,6 +89,7 @@ canonical store + synthetic `nemo_mock/` for local dev. Downstream projects
 | Trees: alpaca_trees (WES), wgs_alpaca_trees (WGS): tumour_id, child, parent from ALPACA input `tree_paths.json` (not CONIPHER: its alternative trees are resolved before ALPACA) | ✅ mock; WES location next to cp_table assumed, TO CONFIRM | `catalog/*alpaca_trees.yml`, `src/tx_data/builds/{_alpaca_tree,alpaca_trees,wgs_alpaca_trees}.py` |
 | cohort_metadata (WES hg19, WGS hg38, assay, sources of trees / CN / WGD calls) | ✅ edit `references/cohorts/cohort_metadata.yml` | `catalog/cohort_metadata.yml`, `src/tx_data/builds/cohort_metadata.py` |
 | chr_table_hg19, chr_table_hg38 (chr, len; 1-22, X, Y; UCSC chrom.sizes) | ✅ | `references/hg19/`, `references/hg38/`, `src/tx_data/builds/chr_table.py` |
+| Catalog + build + mock: wgs_wgd_calls (WGD_WGS_pipeline step 05 output, all calls + quality_pass; location = build parameter `--source-dir` / `TX_WGS_WGD_CALLS_DIR`) | ✅ mock = the pipeline's sandbox run on the WGS mock (2026-11-19). WES `wgd_calls` stays the previous release table until a WES pipeline exists | `catalog/wgs_wgd_calls.yml`, `src/tx_data/builds/wgs_wgd_calls.py`, `nemo_mock/.../wgs_resources/WGD/WGD_WGS_pipeline/05_table/` |
 | Mock: WES manual QC table (read by path by the WGS WGD pipeline, not a table) | ✅ minimal; TODO full column set | `nemo_mock/project/proj-tracerx-lung/tracerx/_RELEASE/release_tx842/_aggregate/` |
 | Tests | ✅ | `tests/test_pipeline.py` (6 passing) |
 

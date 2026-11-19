@@ -1,0 +1,16 @@
+tumour_id	clone	parent	number_of_gds_at_clone	total_gds_per_tumour	quality	status	class	sub_class	quality_code	worst_event_quality	worst_event_quality_code	n_unplaced_events	n_rejected_events	ploidy_prior	quality_pass	upstream_qc	ccf_qc	truncal_min_ccf	qc_pass	qc_reason
+LTX0001-Tumour1	clone1	diploid	1	1	1.0	resolved	clonal_wgd	NA	NA	1.0	NA	0	0	NA	true	pass	pass	98.0	true	NA
+LTX0002-Tumour1	clone1	diploid	0	0	1.0	resolved	no_wgd	NA	NA	NA	NA	0	0	NA	true	pass	pass	98.0	true	NA
+LTX0003-Tumour1	clone1	diploid	0	0	1.0	resolved	no_wgd	NA	NA	NA	NA	0	0	NA	true	pass	pass	98.0	true	NA
+LTX0004-Tumour1	clone1	diploid	1	1	1.0	resolved	clonal_wgd	NA	NA	1.0	NA	0	0	NA	true	pass	pass	98.0	true	NA
+LTX0004-Tumour1	clone2	clone1	0	1	1.0	resolved	clonal_wgd	NA	NA	NA	NA	0	0	NA	true	pass	pass	98.0	true	NA
+LTX0004-Tumour1	clone3	clone1	0	1	1.0	resolved	clonal_wgd	NA	NA	NA	NA	0	0	NA	true	pass	pass	98.0	true	NA
+LTX0101-Tumour1	clone1	diploid	0	0	1.0	resolved	no_wgd	NA	NA	NA	NA	0	0	NA	true	pass	pass	98.0	true	NA
+LTX0102-Tumour1	clone1	diploid	1	1	1.0	resolved	clonal_wgd	NA	NA	1.0	NA	0	0	NA	true	pass	pass	98.0	true	NA
+LTX0103-Tumour1	clone1	diploid	1	1	0.065	resolved	clonal_wgd	NA	borderline_ploidy(0.031:LTX0103_SU_T1-R1);ambiguous_solution(alt:none);reversion(clone2)	0.065	borderline_ploidy(0.031:LTX0103_SU_T1-R1);ambiguous_solution(alt:none);reversion(clone2)	0	0	NA	false	pass	pass	98.0	true	NA
+LTX0103-Tumour1	clone2	clone1	0	1	0.065	resolved	clonal_wgd	NA	borderline_ploidy(0.031:LTX0103_SU_T1-R1);ambiguous_solution(alt:none);reversion(clone2)	NA	NA	0	0	NA	true	pass	pass	98.0	true	NA
+LTX0104-Tumour1	clone1	diploid	0	0	1.0	resolved	no_wgd	NA	NA	NA	NA	0	0	NA	true	pass	pass	98.0	true	NA
+LTX0104-Tumour2	clone1	diploid	NA	NA	NA	qc_failed	NA	NA	NA	NA	NA	NA	NA	NA	NA	pass	fail	86.0	false	ccf: lowest truncal meanCCF 86 <= 90
+LTX0104-Tumour2	clone2	clone1	NA	NA	NA	qc_failed	NA	NA	NA	NA	NA	NA	NA	NA	NA	pass	fail	86.0	false	ccf: lowest truncal meanCCF 86 <= 90
+LTX0105-Tumour1	clone1	diploid	NA	NA	NA	qc_failed	NA	NA	NA	NA	NA	NA	NA	NA	NA	fail	pass	98.0	false	upstream: not FINALIZED
+LTX0106-Tumour1	clone1	diploid	0	0	1.0	resolved	no_wgd	NA	NA	NA	NA	0	0	NA	true	pass	pass	98.0	true	NA
