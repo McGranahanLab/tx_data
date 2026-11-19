@@ -60,6 +60,8 @@ TABLES = (
     "wgs_conipher_cluster_info",
     "wgs_alpaca",
     "wgs_alpaca_wgd_ratios",
+    # WGD_WGS_pipeline output; location from TX_WGS_WGD_CALLS_DIR (else the mock)
+    "wgs_wgd_calls",
 )
 
 # Extra parquet names a builder may emit in addition to `<table>.parquet`.

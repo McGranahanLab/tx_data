@@ -534,3 +534,18 @@ sources:
     tumour_id_form: "wgs_tumour_label (LTX0001 / LTX0002_tumour1)"
     received: 2026-11-17
     received_via: Piotr (Slack DM); same 12 columns as WES wgd_ratio_scores
+
+  wgs_wgd_calls:
+    cohort: wgs
+    # Mock layout only. The real location is a build parameter (as for alpaca_corrected): --source-dir
+    # <WGD_WGS_pipeline run>/wgd/05_table or TX_WGS_WGD_CALLS_DIR (src/tx_data/builds/wgs_wgd_calls.py).
+    relative_path: WGD/WGD_WGS_pipeline/05_table/wgd_calls.tsv
+    format: tsv
+    header: true
+    received: 2026-11-19
+    received_via: darwins_analysis WGD_WGS_pipeline (Piotr's request, 2026-11-19)
+    notes: |
+      Step 05 wgd_calls.tsv of the WGS WGD pipeline: every call (quality_pass marks the ones passing
+      the quality cut-off), QC columns, qc_failed / no_alpaca_tree rows with NA calls. The mock is that
+      pipeline's run on this repo's WGS mock cohort (config.sandbox.toml, WGS PGDD settings).
+
