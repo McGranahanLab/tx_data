@@ -535,6 +535,64 @@ sources:
     received: 2026-11-17
     received_via: Piotr (Slack DM); same 12 columns as WES wgd_ratio_scores
 
+  alpaca_trees:
+    cohort: wes
+    # ALPACA's input tree, next to cp_table.csv. Location assumed from the cp_table layout (2026-11-19);
+    # TO CONFIRM on Nemo.
+    relative_path_pattern: "ALPACA/input/{tumour_id}/tree_paths.json"
+    format: json
+    per_tumour: true
+    per_tumour_layout: nested
+    tumour_id_form: "LTX0001-Tumour1"
+    received: 2026-11-19
+    received_via: Piotr (Slack DM) - trees from ALPACA input, not CONIPHER
+    notes: |
+      The selected tree (trunk -> leaf paths). CONIPHER outputs several alternative trees; the optimal
+      one is chosen before ALPACA, so CONIPHER output is not used for trees.
+
+  wgs_alpaca_trees:
+    cohort: wgs
+    relative_path_pattern: "alpaca/input/{wgs_tumour_label}/tree_paths.json"
+    format: json
+    per_tumour: true
+    per_tumour_discovery: wgs_battenberg_inventory
+    tumour_id_form: "wgs_tumour_label (LTX0001 / LTX0002_tumour1)"
+    received: 2026-11-19
+    received_via: Piotr (Slack DM) - trees from ALPACA input; same files as wgs_tree_clones
+    notes: |
+      As alpaca_trees, for WGS.
+
+  cohort_metadata:
+    cohort: reference
+    source_root: in_repo
+    relative_path: references/cohorts/cohort_metadata.yml
+    format: yaml
+    received: 2026-11-19
+    received_via: Piotr (Slack DM); written in tx_data
+    notes: |
+      Cohort-wide facts (genome build, assay, sample design, sources of trees, CN and WGD calls).
+
+  chr_table_hg19:
+    cohort: reference
+    source_root: in_repo
+    relative_path: references/hg19/hg19.chrom.sizes
+    format: tsv
+    header: false
+    received: 2026-11-19
+    received_via: downloaded from https://hgdownload.soe.ucsc.edu/goldenPath/hg19/bigZips/hg19.chrom.sizes
+    notes: |
+      UCSC chrom.sizes (chrom, length), all contigs; the build keeps 1-22, X, Y.
+
+  chr_table_hg38:
+    cohort: reference
+    source_root: in_repo
+    relative_path: references/hg38/hg38.chrom.sizes
+    format: tsv
+    header: false
+    received: 2026-11-19
+    received_via: downloaded from https://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/hg38.chrom.sizes
+    notes: |
+      UCSC chrom.sizes (chrom, length), all contigs; the build keeps 1-22, X, Y.
   wgs_wgd_calls:
     cohort: wgs
     # Mock layout only. The real location is a build parameter (as for alpaca_corrected): --source-dir

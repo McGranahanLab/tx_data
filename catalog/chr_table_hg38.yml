@@ -1,0 +1,22 @@
+# Catalog: chr_table_hg38. Added 2026-11-19.
+name: chr_table_hg38
+cohort: reference
+description: 'Chromosome lengths for hg38: primary chromosomes 1-22, X, Y (no alt / random / chrUn / chrM), `chr`
+  without the `chr` prefix. WGS is on hg38.'
+provenance:
+  cohort: reference
+  hpc_source: https://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/hg38.chrom.sizes
+  format_on_source: 'TSV, no header: chrom, length (all contigs)'
+  received: '2026-11-19'
+  received_via: downloaded from UCSC, committed as references/hg38/hg38.chrom.sizes
+  canonical_format: Parquet (after build script)
+primary_key:
+- chr
+grain: one row per primary chromosome (24)
+columns:
+- name: chr
+  type: VARCHAR
+  description: 'Chromosome: 1-22, X, Y (no prefix), in that order.'
+- name: len
+  type: BIGINT
+  description: Length in bp (UCSC chrom.sizes).

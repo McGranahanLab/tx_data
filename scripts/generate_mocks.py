@@ -22,7 +22,7 @@ Files written under ``MOCK_ROOT`` (WES release tree):
   - ``tx842_mutation_table.tsv.gz``  (long format, one row per mutation×sample)
   - ``WGD/release_tx842/WGD_calls.tsv``
   - ``tx842_clinical.tsv``
-  - ``ALPACA/input/<tumour>/cp_table.csv``, ``ALPACA/output/cohort_results/all_tumours_combined.csv``
+  - ``ALPACA/input/<tumour>/cp_table.csv`` and ``tree_paths.json`` (the selected tree, trunk -> leaf paths), ``ALPACA/output/cohort_results/all_tumours_combined.csv``
   - ``tx842_purity_ploidy.csv``, ``mapping_files/tx842_samplehash_tumour_lesion_map.tsv``
   - ``primary_met/tx842_primary_met_cloneInfo.df.txt``
   - ``CN-CCF/alphamissense/output/annotated_muttables/tx842/<tumour_muttable_form>_muttable_alpha.tsv``
@@ -47,6 +47,8 @@ Cross-source invariants (asserted in ``tests/test_mock_consistency.py``):
 """
 
 from __future__ import annotations
+
+import json
 
 import gzip
 import hashlib
@@ -996,6 +998,16 @@ def _write_clone_proportions(specs: list[TumourSpec]) -> None:
 
         out = tumour_dir / "cp_table.csv"
         out.write_text("\n".join(rows) + "\n")
+        # ALPACA's selected tree next to cp_table (2026-11-19): trunk -> leaf paths, as on the WGS side.
+        parent = {c.name: c.parent for c in spec.clones}
+        leaves = [c for c in clone_names if c not in set(parent.values())]
+        paths = []
+        for leaf in leaves:
+            path = [leaf]
+            while parent[path[0]] != "diploid":
+                path.insert(0, parent[path[0]])
+            paths.append(path)
+        (tumour_dir / "tree_paths.json").write_text(json.dumps(paths) + "\n")
     print(f"wrote {sum(1 for s in specs if s.status == 'resolved')} cp_table.csv files under {CLONE_PROP_ROOT}")
 
 
