@@ -33,6 +33,7 @@ import polars as pl
 
 from tx_data import wgs_samples
 from tx_data.builds._base import canonical_output_path, log
+from tx_data.builds._wgs_tumour_files import r_int
 from tx_data.sources import resolve_source
 
 TABLE = "wgs_consensus_segments"
@@ -80,6 +81,8 @@ def _read_one(label: str, path, msai_adjusted: bool) -> pl.DataFrame:
     missing = {"SAMPLE", "CHR", "STARTPOS", "ENDPOS"} - set(df.columns)
     if missing:
         raise ValueError(f"{path}: missing columns {sorted(missing)}; got {df.columns!r}")
+    if df.schema["STARTPOS"] == pl.String or df.schema["ENDPOS"] == pl.String:
+        df = r_int(df, ("STARTPOS", "ENDPOS"), path)       # R scientific notation (`2e+07`)
 
     return df.select(
         pl.lit(label).alias("wgs_tumour_label"),

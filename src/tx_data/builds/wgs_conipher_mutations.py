@@ -15,7 +15,7 @@ from pathlib import Path
 
 import polars as pl
 
-from tx_data.builds._wgs_tumour_files import ID_COLS, build_per_tumour, read_tsv, require, sample_hash
+from tx_data.builds._wgs_tumour_files import ID_COLS, build_per_tumour, r_int, read_tsv, require, sample_hash
 from tx_data.normalize import canonical_chr_expr
 from tx_data.sources import resolve_source
 
@@ -37,6 +37,7 @@ SCHEMA = {**ID_COLS, "sample": pl.String, "sample_name_hash": pl.String, "chr": 
 def read_one(label: str, path: Path) -> pl.DataFrame:
     muts = read_tsv(path)
     require(muts, SOURCE, path)
+    muts = r_int(muts, ("POS", "CLUSTER"), path)
     ploidy = pl.col("PLOIDY").cast(pl.Float64) if "PLOIDY" in muts.columns else pl.lit(None, pl.Float64)
     df = muts.select(*[pl.col(s).cast(t).alias(n) for s, (n, t) in SOURCE.items()], ploidy.alias("ploidy"))
     tt_path = resolve_source(TABLE, pattern_key=TREE_TABLE_PATTERN, wgs_tumour_label=label)
@@ -44,6 +45,7 @@ def read_one(label: str, path: Path) -> pl.DataFrame:
         raise FileNotFoundError(f"{tt_path}: treeTable.tsv missing next to {path.name}")
     tt = read_tsv(tt_path)
     require(tt, ("mutation_id", "SAMPLE", "treeCLUSTER"), tt_path)
+    tt = r_int(tt, ("treeCLUSTER",), tt_path)
     tt = tt.select(pl.col("mutation_id"), pl.col("SAMPLE").alias("sample"),
                    pl.col("treeCLUSTER").cast(pl.Int64).alias("tree_cluster")).unique(["mutation_id", "sample"])
     return (df.join(tt, on=["mutation_id", "sample"], how="left")

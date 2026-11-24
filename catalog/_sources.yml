@@ -60,6 +60,10 @@ alt_source_roots:
   # Clinical / QC release tree — sits outside the main tracerx_842 release
   # subtree. Used currently by id_crosswalk; may host more clinical assets.
   tx842_clinical_qc: /nemo/project/proj-tracerx-lung/tctProjects/lungTx/Tx842/clinical_qc/6_release/cohort
+  # tx842 per-patient release tree (Piotr, 2026-11-24): <patient>/mutation_clusters/tumour_<n>/
+  # (PyClone/CONIPHER SCoutput) and <patient>/mutation_trees/tumour_<n>/ (CONIPHER tree outputs);
+  # _aggregate/ holds the manual QC table. Different tree from the WES source_root_default.
+  tx842_release: /nemo/project/proj-tracerx-lung/tracerx/_RELEASE/release_tx842
   # Canonical WGS Battenberg output tree: one subdirectory per tumour,
   # symlinked to the run directories. Relevant subdirectories: MSAI,
   # optimal_solutions, results, tree_input (ignore intermediate, logs,
@@ -234,6 +238,71 @@ sources:
       by a trailing `clone` column; values are proportions in [0, 1]. The
       loader melts to long canonical form and derives tumour_id from the
       containing directory name.
+
+  conipher_mutations:
+    cohort: wes
+    source_root: tx842_release
+    relative_path_pattern: "{patient_id}/mutation_clusters/tumour_{tumour_n}/{patient_id}_{tumour_n}.SCoutput.CLEAN.tsv"
+    relative_path_pattern_tree_table: "{patient_id}/mutation_trees/tumour_{tumour_n}/treeTable.tsv"
+    format: tsv
+    header: true
+    per_tumour: true
+    per_tumour_layout: nested        # <patient>/mutation_clusters/tumour_<n>/
+    per_tumour_discovery: folder listing (<patient>/mutation_clusters/tumour_<n>/)
+    tumour_id_form: "path LTX0001 + tumour_1; CASE_ID LTX0001_1"
+    received: 2026-11-24
+    received_via: Piotr (Slack DM) supplied both folder patterns, listings and the SCoutput header
+    notes: |
+      SCoutput.CLEAN.tsv (mutation x sample; also in the folder: DIRTY, FULL, results.tsv, PyClone RData)
+      joined with treeTable.tsv (mutation_id, SAMPLE, treeCLUSTER) from the tumour's mutation_trees
+      folder. WES counterpart of wgs_conipher_mutations; input of WGD step 00 (WGD_pipeline, WES config).
+
+  conipher_tree_edges:
+    cohort: wes
+    source_root: tx842_release
+    relative_path_pattern: "{patient_id}/mutation_trees/tumour_{tumour_n}/allTrees.txt"
+    format: text
+    per_tumour: true
+    per_tumour_layout: nested        # <patient>/mutation_trees/tumour_<n>/
+    per_tumour_discovery: folder listing (<patient>/mutation_trees/tumour_<n>/)
+    received: 2026-11-24
+    received_via: Piotr (Slack DM) supplied the mutation_trees folder pattern and listing
+    notes: |
+      CONIPHER allTrees.txt; the first (`# tree 1`) block is the default tree. WES counterpart of
+      wgs_conipher_tree_edges; input of WGD step 00 (WGD_pipeline, WES config).
+
+  conipher_cluster_info:
+    cohort: wes
+    source_root: tx842_release
+    relative_path_pattern: "{patient_id}/mutation_trees/tumour_{tumour_n}/clusterInfo.txt"
+    format: tsv
+    header: true
+    per_tumour: true
+    per_tumour_layout: nested        # <patient>/mutation_trees/tumour_<n>/
+    per_tumour_discovery: folder listing (<patient>/mutation_trees/tumour_<n>/)
+    received: 2026-11-24
+    received_via: Piotr (Slack DM) supplied the mutation_trees folder pattern and listing
+    notes: |
+      CONIPHER clusterInfo.txt (clusterID, SAMPLE, truncal, treeClust, meanCCF). WES counterpart of
+      wgs_conipher_cluster_info; input of the WGD pipeline's CCF QC (WGD_pipeline, WES config).
+
+  msai_segments:
+    cohort: wes
+    relative_path_pattern: "ALPACA/input/{tumour_id}/ALPACA_input_table.csv"
+    format: csv
+    header: true
+    per_tumour: true
+    per_tumour_layout: nested        # ALPACA/input/<tumour_id>/
+    tumour_id_form: "LTX0001-Tumour1"
+    received: 2026-11-24
+    received_via: Piotr (Slack DM) - WES ALPACA folder, tables as on the WGS side
+    notes: |
+      ALPACA input table (tumour_id, segment, sample, cpnA, cpnB): fractional allele-specific CN per
+      segment per sample from Refphase (ASCAT, then Refphase, which detects MSAI itself, so already
+      MSAI-corrected; the same solution feeds CONIPHER). WES counterpart of wgs_consensus_segments
+      (Battenberg + post-hoc MSAI correction); input of WGD step 00 (WGD_pipeline, WES config).
+      ALPACA/input and ALPACA/output are symlinks the ALPACA pipeline does not update, so they can
+      point at different ALPACA versions (Piotr, 2026-11-24); the build logs both targets.
 
   kallisto_counts:
     cohort: wes

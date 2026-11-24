@@ -1,0 +1,108 @@
+# Catalog: conipher_mutations (WES). Added 2026-11-24 for the WES configuration of WGD_pipeline.
+name: conipher_mutations
+cohort: wes
+description: CONIPHER mutations of each WES (tx842) tumour from the release tree, one row per mutation x sample,
+  with the tree cluster from treeTable.tsv. WES counterpart of `wgs_conipher_mutations` (same columns except the
+  WGS id columns); input of the WGD pipeline's step 00 (PGDD input) through WGD_pipeline `config.wes.toml`
+  (Piotr, 2026-11-24).
+provenance:
+  cohort: TRACERx 842 (WES)
+  hpc_source: /nemo/project/proj-tracerx-lung/tracerx/_RELEASE/release_tx842/<patient>/mutation_clusters/tumour_<n>/<patient>_<n>.SCoutput.CLEAN.tsv
+    (+ <patient>/mutation_trees/tumour_<n>/treeTable.tsv)
+  format_on_source: TSV, header row, one per tumour (CASE_ID SAMPLE CHR POS REF ALT REF_COUNT VAR_COUNT DEPTH
+    CLUSTER CCF_PHYLO CCF_OBS MUT_COPY COPY_NUMBER_A COPY_NUMBER_B ACF PLOIDY mutation_id)
+  received: '2026-11-24'
+  received_via: 'Piotr (Slack DM): folder patterns, folder listings, SCoutput.CLEAN header'
+  canonical_format: Parquet (after build script)
+  consumer: darwins_analysis WGD_pipeline (config.wes.toml)
+primary_key:
+- tumour_id
+- mutation_id
+- sample
+grain: one row per (WES tumour x mutation x sample)
+genome_build: hg19
+chr_prefix: false
+columns:
+- name: tumour_id
+  type: VARCHAR
+  description: Canonical tumour ID (`LTX0001-Tumour1`), from the folder path (`LTX0001/.../tumour_1`); the file's
+    CASE_ID (`LTX0001_1`) must agree.
+  null_semantics: not_applicable
+  derived: true
+- name: patient_id
+  type: VARCHAR
+  description: Patient ID (`LTX0001`).
+  null_semantics: not_applicable
+  derived: true
+- name: sample
+  type: VARCHAR
+  description: Sample name in the form used across tx_data (`LTX0001_SU_T1-R1--<hash>`, = clone_proportions
+    `sample_id`), converted from the R-style source SAMPLE (`LTX0001_SU_T1.R1..<hash>`; `..` -> `--`, `.` -> `-`;
+    Piotr, 2026-11-24). treeTable SAMPLE is converted the same way before the join.
+  null_semantics: not_applicable
+  derived: true
+- name: chr
+  type: VARCHAR
+  description: Chromosome, no `chr` prefix (source CHR).
+  null_semantics: not_applicable
+  derived: false
+- name: pos
+  type: BIGINT
+  description: Position (source POS), hg19.
+  null_semantics: not_applicable
+  derived: false
+- name: ref
+  type: VARCHAR
+  description: Reference allele.
+  null_semantics: not_applicable
+  derived: false
+- name: alt
+  type: VARCHAR
+  description: Alternative allele.
+  null_semantics: not_applicable
+  derived: false
+- name: mutation_id
+  type: VARCHAR
+  description: CONIPHER mutation_id verbatim (key into treeTable); on the real files without a patient prefix
+    (`:1:1896318:C:T`, Piotr 2026-11-24), so unique only within a tumour.
+  null_semantics: not_applicable
+  derived: false
+- name: cluster
+  type: BIGINT
+  description: CONIPHER cluster (source CLUSTER), before tree building.
+  null_semantics: not_applicable
+  derived: false
+- name: tree_cluster
+  type: BIGINT
+  description: treeCLUSTER from treeTable.tsv for this mutation x sample; null when treeTable leaves it out (cluster
+    not on the tree) or the tumour has no treeTable.tsv.
+  null_semantics: missing_on_source
+  derived: false
+- name: mut_copy
+  type: DOUBLE
+  description: 'Mutation copy number (source MUT_COPY): ~2 means the mutation sits on a doubled chromosome.'
+  null_semantics: not_applicable
+  derived: false
+- name: cn_a
+  type: DOUBLE
+  description: Allele-specific copy number A at the locus (source COPY_NUMBER_A).
+  null_semantics: not_applicable
+  derived: false
+- name: cn_b
+  type: DOUBLE
+  description: Allele-specific copy number B at the locus (source COPY_NUMBER_B).
+  null_semantics: not_applicable
+  derived: false
+- name: ploidy
+  type: DOUBLE
+  description: Sample ploidy (source PLOIDY); null if the file has none.
+  null_semantics: missing_on_source
+  derived: false
+relationships:
+  - column: [tumour_id, sample]
+    references: [clone_proportions.tumour_id, clone_proportions.sample_id]
+
+scope_notes: |
+  WGS counterpart: wgs_conipher_mutations (same columns except wgs_tumour_label / sample_name_hash). Only SCoutput.CLEAN is read; DIRTY / FULL in the same folder are not.
+
+open_questions: []

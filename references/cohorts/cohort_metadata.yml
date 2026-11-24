@@ -9,6 +9,7 @@ wes:
   samples: multi-region, several samples per tumour
   tumour_id_form: LTX0001-Tumour1 (canonical in every tx_data table)
   source_root: /nemo/project/proj-tracerx-lung/tctProjects/lungTx/Tx842/release/tracerx_842
+  copy_number: ASCAT, then Refphase; Refphase detects MSAI itself, so its output is already MSAI-corrected (no separate MSAI step or MSAI_adjusted files). Fractional CN per segment per sample, the same solution that feeds CONIPHER and the ALPACA input (Piotr, 2026-11-24)
   trees: ALPACA input tree_paths.json (alpaca_trees); CONIPHER gives several alternative trees, the optimal one is selected before ALPACA
   clone_copy_number: ALPACA (alpaca, ALPACA/output/cohort_results/all_tumours_combined.csv)
   wgd_calls: previous release table WGD/release_tx842/WGD_calls.tsv (wgd_calls); a WES WGD pipeline is TODO
@@ -21,7 +22,7 @@ wgs:
   samples: mostly single-sample tumours; some multi-region
   tumour_id_form: LTX0001-Tumour1 canonical; folders use the label LTX0001 (single-tumour patient) or LTX0002_tumour1 (multi-tumour patient)
   source_root: /nemo/project/proj-tracerx-lung/tctProjects/CN-CCF/wgs_resources
-  copy_number: Battenberg (optimal solution per sample) with MSAI-adjusted consensus segments; single-sample tumours use the NOT adjusted file
+  copy_number: Battenberg (optimal solution per sample) with MSAI-adjusted consensus segments; single-sample tumours use the NOT adjusted file. Battenberg does no MSAI detection, hence the post-hoc MSAI correction; WES gets the same from Refphase. Fractional CN per segment per sample, input to both CONIPHER and ALPACA (Piotr, 2026-11-24)
   conipher_run: /nemo/project/proj-tracerx-wgs/working/grimesk/CONIPHERwgs/2026_08_mean_max_absent/runs/cleaning_noisefloor_artefact/snv
   trees: ALPACA input tree_paths.json (wgs_alpaca_trees); not CONIPHER's alternative trees
   clone_copy_number: ALPACA (wgs_alpaca, alpaca/output/tumour_results/<label>/)
