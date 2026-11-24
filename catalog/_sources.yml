@@ -257,6 +257,35 @@ sources:
       joined with treeTable.tsv (mutation_id, SAMPLE, treeCLUSTER) from the tumour's mutation_trees
       folder. WES counterpart of wgs_conipher_mutations; input of WGD step 00 (WGD_pipeline, WES config).
 
+  conipher_tree_edges:
+    cohort: wes
+    source_root: tx842_release
+    relative_path_pattern: "{patient_id}/mutation_trees/tumour_{tumour_n}/allTrees.txt"
+    format: text
+    per_tumour: true
+    per_tumour_layout: nested        # <patient>/mutation_trees/tumour_<n>/
+    per_tumour_discovery: folder listing (<patient>/mutation_trees/tumour_<n>/)
+    received: 2026-11-24
+    received_via: Piotr (Slack DM) supplied the mutation_trees folder pattern and listing
+    notes: |
+      CONIPHER allTrees.txt; the first (`# tree 1`) block is the default tree. WES counterpart of
+      wgs_conipher_tree_edges; input of WGD step 00 (WGD_pipeline, WES config).
+
+  conipher_cluster_info:
+    cohort: wes
+    source_root: tx842_release
+    relative_path_pattern: "{patient_id}/mutation_trees/tumour_{tumour_n}/clusterInfo.txt"
+    format: tsv
+    header: true
+    per_tumour: true
+    per_tumour_layout: nested        # <patient>/mutation_trees/tumour_<n>/
+    per_tumour_discovery: folder listing (<patient>/mutation_trees/tumour_<n>/)
+    received: 2026-11-24
+    received_via: Piotr (Slack DM) supplied the mutation_trees folder pattern and listing
+    notes: |
+      CONIPHER clusterInfo.txt (clusterID, SAMPLE, truncal, treeClust, meanCCF). WES counterpart of
+      wgs_conipher_cluster_info; input of the WGD pipeline's CCF QC (WGD_pipeline, WES config).
+
   kallisto_counts:
     cohort: wes
     source_root: tx842_mets_rnaseq

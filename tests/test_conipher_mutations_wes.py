@@ -1,4 +1,5 @@
-"""conipher_mutations (WES) on the committed mock (release_tx842 tree; WGD_pipeline config.wes.toml, 2026-11-24)."""
+"""conipher_mutations, conipher_tree_edges, conipher_cluster_info (WES) on the committed mock (release_tx842
+tree; inputs of WGD_pipeline config.wes.toml, 2026-11-24)."""
 
 from __future__ import annotations
 
@@ -22,6 +23,45 @@ def built():
     cp = BUILDERS["clone_proportions"]()
     yield BUILDERS["conipher_mutations"](), cp
     mp.undo()
+
+
+@pytest.fixture(scope="module")
+def trees():
+    mp = pytest.MonkeyPatch()
+    mp.delenv("TX_NEMO_ROOT", raising=False)
+    from tx_data.builds import BUILDERS
+
+    yield BUILDERS["conipher_tree_edges"](), BUILDERS["conipher_cluster_info"]()
+    mp.undo()
+
+
+def test_tree_tables_catalog_and_tumours(trees):
+    with_tree = {t["tumour_id_canonical"] for t in MANIFEST if t["has_tree"]}
+    for name, df in zip(("conipher_tree_edges", "conipher_cluster_info"), trees):
+        assert [c["name"] for c in catalog.load_catalog(name)["columns"]] == df.columns, name
+        assert set(df["tumour_id"]) == with_tree, name
+
+
+def test_tree_edges_are_the_manifest_tree(trees):
+    edges, _ = trees
+    for t in MANIFEST:
+        if not t["has_tree"]:
+            continue
+        g = edges.filter(pl.col("tumour_id") == t["tumour_id_canonical"])
+        want = {(int(c["parent"][5:]), int(c["name"][5:])) for c in t["clones"] if c["parent"] != "diploid"}
+        assert set(g.select("parent_cluster", "child_cluster").iter_rows()) == want     # default tree only
+        assert set(g["n_trees"]) == {2 if t["patient_id"] == "LTX0004" else 1}
+
+
+def test_cluster_info_ccf_qc_inputs(trees):
+    _, info = trees
+    assert info["sample"].str.contains(r"\.").sum() == 0 and info["sample"].null_count() == 0
+    trunk = info.filter(pl.col("truncal"))
+    assert set(trunk["cluster_id"]) == {1} and trunk["mean_ccf"].min() > 90
+    off = info.filter(pl.col("tree_clust").is_null())
+    assert set(off.select("tumour_id", "cluster_id").unique().iter_rows()) == {
+        (t["tumour_id_canonical"], c) for t in MANIFEST if t["has_tree"] for c in t["non_tree_clusters"]}
+    assert off["mean_ccf"].null_count() == off.height
 
 
 def test_catalog_columns_match(built):

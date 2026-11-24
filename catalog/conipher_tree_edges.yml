@@ -1,0 +1,47 @@
+# Catalog: conipher_tree_edges (WES). Added 2026-11-24 for the WES configuration of WGD_pipeline.
+name: conipher_tree_edges
+cohort: wes
+description: Default (first) CONIPHER tree of each WES (tx842) tumour (allTrees.txt in the release tree), one row per
+  edge. A single-cluster tree is the self-loop 1 -> 1, as CONIPHER writes it. WES counterpart of wgs_conipher_tree_edges.
+provenance:
+  cohort: TRACERx 842 (WES)
+  hpc_source: /nemo/project/proj-tracerx-lung/tracerx/_RELEASE/release_tx842/<patient>/mutation_trees/tumour_<n>/allTrees.txt
+  format_on_source: 'text: `# tree N` headers, then `parent<TAB>child` edges; one per tumour'
+  received: '2026-11-24'
+  received_via: 'Piotr (Slack DM): mutation_trees folder pattern and listing'
+  canonical_format: Parquet (after build script)
+  consumer: darwins_analysis WGD_pipeline (config.wes.toml)
+primary_key:
+- tumour_id
+- parent_cluster
+- child_cluster
+grain: one row per (WES tumour x edge of the default tree)
+columns:
+- name: tumour_id
+  type: VARCHAR
+  description: Canonical tumour ID (`LTX0001-Tumour1`), from the folder path (`LTX0001/mutation_trees/tumour_1`).
+  null_semantics: not_applicable
+  derived: true
+- name: patient_id
+  type: VARCHAR
+  description: Patient ID (`LTX0001`).
+  null_semantics: not_applicable
+  derived: true
+- name: parent_cluster
+  type: BIGINT
+  description: Parent cluster of the edge.
+  null_semantics: not_applicable
+  derived: false
+- name: child_cluster
+  type: BIGINT
+  description: Child cluster (equal to the parent for a single-cluster tree).
+  null_semantics: not_applicable
+  derived: false
+- name: n_trees
+  type: BIGINT
+  description: Number of alternative trees in allTrees.txt (only the first is kept).
+  null_semantics: not_applicable
+  derived: true
+scope_notes: 'WGS counterpart: wgs_conipher_tree_edges (same columns except wgs_tumour_label).
+
+  '

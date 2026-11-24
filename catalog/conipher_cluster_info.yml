@@ -1,0 +1,58 @@
+# Catalog: conipher_cluster_info (WES). Added 2026-11-24 for the WES configuration of WGD_pipeline.
+name: conipher_cluster_info
+cohort: wes
+description: 'CONIPHER clusterInfo.txt of each WES (tx842) tumour (release tree), the columns the WGD pipeline''s CCF
+  QC reads: the lowest meanCCF over truncal tree clusters must be above 90%. WES counterpart of wgs_conipher_cluster_info.'
+provenance:
+  cohort: TRACERx 842 (WES)
+  hpc_source: /nemo/project/proj-tracerx-lung/tracerx/_RELEASE/release_tx842/<patient>/mutation_trees/tumour_<n>/clusterInfo.txt
+  format_on_source: TSV, header row, one per tumour
+  received: '2026-11-24'
+  received_via: 'Piotr (Slack DM): mutation_trees folder pattern and listing'
+  canonical_format: Parquet (after build script)
+  consumer: darwins_analysis WGD_pipeline (config.wes.toml)
+primary_key:
+- tumour_id
+- cluster_id
+- sample
+grain: one row per (WES tumour x cluster x sample)
+columns:
+- name: tumour_id
+  type: VARCHAR
+  description: Canonical tumour ID (`LTX0001-Tumour1`), from the folder path (`LTX0001/mutation_trees/tumour_1`).
+  null_semantics: not_applicable
+  derived: true
+- name: patient_id
+  type: VARCHAR
+  description: Patient ID (`LTX0001`).
+  null_semantics: not_applicable
+  derived: true
+- name: cluster_id
+  type: BIGINT
+  description: Source clusterID.
+  null_semantics: not_applicable
+  derived: false
+- name: sample
+  type: VARCHAR
+  description: Source SAMPLE converted from R-style (`LTX0001_SU_T1.R1..<hash>`) to the dash form used across tx_data
+    (`LTX0001_SU_T1-R1--<hash>`); null if the file has no SAMPLE.
+  null_semantics: missing_on_source
+  derived: true
+- name: truncal
+  type: BOOLEAN
+  description: Source truncal (R logical); null for NA.
+  null_semantics: missing_on_source
+  derived: false
+- name: tree_clust
+  type: BOOLEAN
+  description: 'Source treeClust: the cluster is on the tree; null for NA.'
+  null_semantics: missing_on_source
+  derived: false
+- name: mean_ccf
+  type: DOUBLE
+  description: Source meanCCF, in percent (0 to ~100); null for NA (clusters off the tree).
+  null_semantics: missing_on_source
+  derived: false
+scope_notes: 'WGS counterpart: wgs_conipher_cluster_info (same columns except wgs_tumour_label, sample_name_hash).
+
+  '

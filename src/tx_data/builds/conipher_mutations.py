@@ -6,8 +6,9 @@ joined with `<patient>/mutation_trees/tumour_<n>/treeTable.tsv` on (mutation_id,
 WES counterpart of `wgs_conipher_mutations`, same columns except the WGS id columns; input of the WGD
 pipeline's step 00 (PGDD input) through WGD_pipeline's `config.wes.toml`.
 
-Tumours are discovered from the `mutation_clusters/tumour_<n>/` folders. `tumour_id` comes from the path
-(`LTX0001` + `tumour_1` → `LTX0001-Tumour1`); the file's CASE_ID must agree (`LTX0001_1`).
+Tumours are discovered from the `mutation_clusters/tumour_<n>/` folders (`_wes_release_files`).
+`tumour_id` comes from the path (`LTX0001` + `tumour_1` → `LTX0001-Tumour1`); the file's CASE_ID must
+agree (`LTX0001_1`).
 `tree_cluster` is null for mutations treeTable leaves out, and for a whole tumour without a treeTable
 (logged). SCoutput writes SAMPLE R-style (`LTX0001_SU_T1.R1..<hash>`); `sample` is converted to the form
 used everywhere else (`LTX0001_SU_T1-R1--<hash>`, as in clone_proportions) in both files before the join
@@ -17,12 +18,12 @@ used everywhere else (`LTX0001_SU_T1-R1--<hash>`, as in clone_proportions) in bo
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 import polars as pl
 
 from tx_data.builds._base import canonical_output_path, log
+from tx_data.builds._wes_release_files import dash_sample, discover, tumour_id
 from tx_data.builds._wgs_tumour_files import read_tsv, require
 from tx_data.normalize import canonical_chr_expr
 from tx_data.sources import resolve_source
@@ -40,33 +41,6 @@ SCHEMA = {"tumour_id": pl.String, "patient_id": pl.String, "sample": pl.String,
           "chr": pl.String, "pos": pl.Int64, "ref": pl.String, "alt": pl.String, "mutation_id": pl.String,
           "cluster": pl.Int64, "tree_cluster": pl.Int64, "mut_copy": pl.Float64, "cn_a": pl.Float64,
           "cn_b": pl.Float64, "ploidy": pl.Float64}
-TUMOUR_DIR = re.compile(r"tumour_(\d+)$")
-
-
-def discover() -> list[tuple[str, str, Path]]:
-    """`[(patient_id, n, scoutput_path), ...]` for every `<patient>/mutation_clusters/tumour_<n>/` with a file."""
-    probe = resolve_source(TABLE, patient_id="__probe__", tumour_n="1")
-    root = probe.parents[3]                        # release_tx842/
-    if not root.is_dir():
-        log(f"{TABLE}: release root does not exist: {root}")
-        return []
-    found, empty = [], []
-    for tdir in sorted(root.glob("*/mutation_clusters/tumour_*")):
-        m = TUMOUR_DIR.search(tdir.name)
-        if not m or tdir.parts[-3].startswith("_"):
-            continue
-        patient, n = tdir.parts[-3], m.group(1)
-        f = resolve_source(TABLE, patient_id=patient, tumour_n=n)
-        (found if f.is_file() else empty).append((patient, n, f))
-    if empty:
-        log(f"warning: {TABLE}: no SCoutput.CLEAN.tsv in {len(empty)} tumour folder(s): "
-            f"{[f'{p}_{n}' for p, n, _ in empty]}")
-    return found
-
-
-def dash_sample(col: str = "sample") -> pl.Expr:
-    """R-style `LTX0001_SU_T1.R1..<hash>` -> `LTX0001_SU_T1-R1--<hash>`; dash-form names unchanged."""
-    return pl.col(col).str.replace_all(r"\.\.", "--").str.replace_all(r"\.", "-").alias(col)
 
 
 def _known_samples() -> set[tuple[str, str]] | None:
@@ -101,13 +75,13 @@ def read_one(patient: str, n: str, path: Path) -> pl.DataFrame:
         df = df.with_columns(pl.lit(None, pl.Int64).alias("tree_cluster"))
     return df.with_columns(
         canonical_chr_expr("chr"),
-        pl.lit(f"{patient}-Tumour{n}").alias("tumour_id"),
+        pl.lit(tumour_id(patient, n)).alias("tumour_id"),
         pl.lit(patient).alias("patient_id"),
     )
 
 
 def build() -> pl.DataFrame:
-    files = discover()
+    files = discover(TABLE)
     known = _known_samples()
     frames, no_tree = [], []
     for patient, n, path in files:
