@@ -47,6 +47,9 @@ TABLES = (
     # conipher_trees emits TWO parquets (conipher_ccf, conipher_clonality);
     # _write_manifest discovers both via its special-case fallbacks below.
     "conipher_trees",
+    # WES CONIPHER mutations from the tx842 release tree (WGD_pipeline, config.wes.toml);
+    # after clone_proportions, which gives its sample_id
+    "conipher_mutations",
     "purity_ploidy",
     # ---- WGS cohort ----
     # Inventory first: the other WGS builds discover tumours and samples from it.
