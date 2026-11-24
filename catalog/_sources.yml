@@ -286,6 +286,24 @@ sources:
       CONIPHER clusterInfo.txt (clusterID, SAMPLE, truncal, treeClust, meanCCF). WES counterpart of
       wgs_conipher_cluster_info; input of the WGD pipeline's CCF QC (WGD_pipeline, WES config).
 
+  msai_segments:
+    cohort: wes
+    relative_path_pattern: "ALPACA/input/{tumour_id}/ALPACA_input_table.csv"
+    format: csv
+    header: true
+    per_tumour: true
+    per_tumour_layout: nested        # ALPACA/input/<tumour_id>/
+    tumour_id_form: "LTX0001-Tumour1"
+    received: 2026-11-24
+    received_via: Piotr (Slack DM) - WES ALPACA folder, tables as on the WGS side
+    notes: |
+      ALPACA input table (tumour_id, segment, sample, cpnA, cpnB): fractional allele-specific CN per
+      segment per sample from Refphase (ASCAT, then Refphase, which detects MSAI itself, so already
+      MSAI-corrected; the same solution feeds CONIPHER). WES counterpart of wgs_consensus_segments
+      (Battenberg + post-hoc MSAI correction); input of WGD step 00 (WGD_pipeline, WES config).
+      ALPACA/input and ALPACA/output are symlinks the ALPACA pipeline does not update, so they can
+      point at different ALPACA versions (Piotr, 2026-11-24); the build logs both targets.
+
   kallisto_counts:
     cohort: wes
     source_root: tx842_mets_rnaseq

@@ -1,0 +1,99 @@
+# Catalog: msai_segments (WES). Added 2026-11-24 for the WES configuration of WGD_pipeline.
+name: msai_segments
+cohort: wes
+description: Fractional allele-specific copy number per segment per sample for the WES (tx842) cohort, from the ALPACA
+  input table. WES counterpart of `wgs_consensus_segments`; input of the WGD pipeline's step 00 (per-sample num_gds)
+  through WGD_pipeline `config.wes.toml` (Piotr, 2026-11-24).
+provenance:
+  cohort: TRACERx 842 (WES)
+  hpc_source: /nemo/project/proj-tracerx-lung/tctProjects/lungTx/Tx842/release/tracerx_842/ALPACA/input/<tumour_id>/ALPACA_input_table.csv
+  format_on_source: CSV, header row, one per tumour (tumour_id, segment, sample, cpnA, cpnB)
+  received: '2026-11-24'
+  received_via: 'Piotr (Slack DM): WES ALPACA folder; tables as on the WGS side'
+  canonical_format: Parquet (after build script)
+  consumer: darwins_analysis WGD_pipeline (config.wes.toml)
+primary_key:
+- tumour_id
+- sample
+- chr
+- start
+grain: one row per (WES tumour x sample x segment)
+genome_build: hg19
+chr_prefix: false
+columns:
+- name: tumour_id
+  type: VARCHAR
+  description: Canonical tumour ID (`LTX0001-Tumour1`), the ALPACA/input folder name; the file's tumour_id must agree.
+  null_semantics: not_applicable
+  derived: true
+- name: patient_id
+  type: VARCHAR
+  description: Patient ID (`LTX0001`).
+  null_semantics: not_applicable
+  derived: true
+- name: sample
+  type: VARCHAR
+  description: Source `sample` in the dash form (`LTX0001_SU_T1-R1--<hash>`; R-style `.`/`..` converted if present).
+    Must equal conipher_mutations `sample` for WGD step 00.
+  null_semantics: not_applicable
+  derived: false
+- name: chr
+  type: VARCHAR
+  description: Chromosome from `segment` (`<chr>_<start>_<end>`), no `chr` prefix.
+  null_semantics: not_applicable
+  derived: true
+- name: start
+  type: BIGINT
+  description: Segment start from `segment`, hg19.
+  null_semantics: not_applicable
+  derived: true
+- name: end
+  type: BIGINT
+  description: Segment end from `segment`, hg19.
+  null_semantics: not_applicable
+  derived: true
+- name: cn_a
+  type: DOUBLE
+  description: Fractional copy number of phased allele A in this sample (source cpnA).
+  null_semantics: missing_on_source
+  derived: false
+- name: cn_b
+  type: DOUBLE
+  description: Fractional copy number of phased allele B in this sample (source cpnB).
+  null_semantics: missing_on_source
+  derived: false
+- name: cn_major
+  type: DOUBLE
+  description: max(cn_a, cn_b); what WGD step 00 reads (as COPY_NUMBER_A).
+  null_semantics: missing_on_source
+  derived: true
+- name: cn_minor
+  type: DOUBLE
+  description: min(cn_a, cn_b).
+  null_semantics: missing_on_source
+  derived: true
+- name: cn_total
+  type: DOUBLE
+  description: cn_a + cn_b.
+  null_semantics: missing_on_source
+  derived: true
+relationships:
+- column:
+  - tumour_id
+  - sample
+  references:
+  - conipher_mutations.tumour_id
+  - conipher_mutations.sample
+scope_notes: 'Why WES and WGS segments differ (Piotr, 2026-11-24): WES runs ASCAT, then Refphase; Refphase detects MSAI
+  itself, so its output is already MSAI-corrected and there are no MSAI_adjusted files. WGS runs Battenberg, which does
+  no MSAI detection, hence the post-hoc MSAI correction (wgs_consensus_segments). Both give fractional CN per segment
+  per sample, and the same solution feeds CONIPHER and ALPACA. The name `msai_segments` is kept for symmetry with the
+  WGS input.
+
+  ALPACA/input and ALPACA/output are symbolic links that the ALPACA pipeline does not update, so they can point at different
+  ALPACA versions; the build logs where both resolve to. Check them after every ALPACA rerun.
+
+  '
+open_questions:
+- Column names of the real WES ALPACA_input_table.csv not seen yet; assumed tumour_id, segment, sample, cpnA, cpnB (the
+  build fails with the actual header if not).
