@@ -114,3 +114,18 @@ def test_case_id_mismatch_fails(tmp_path, monkeypatch):
                                                                          "m", "1", "1", "1", "1")) + "\n")
     with pytest.raises(ValueError, match="CASE_ID"):
         cm.read_one("LTX0001", "1", f)
+
+
+def test_r_scientific_notation_integers(tmp_path):
+    """Nemo 2026-11-24: R wrote POS 20000000 as `2e+07`; parsed as 20000000; a fractional value still fails."""
+    from tx_data.builds import conipher_mutations as cm
+
+    head = "\t".join(("CASE_ID", *cm.SOURCE)) + "\n"
+    row = lambda pos: "\t".join(("LTX0001_1", "S.R1..h", "1", pos, "A", "C", ":1:2e+07:A:C", "2", "1", "1", "1"))  # noqa: E731
+    f = tmp_path / "LTX0001_1.SCoutput.CLEAN.tsv"
+    f.write_text(head + row("2e+07") + "\n" + row("1896318") + "\n")
+    df = cm.read_one("LTX0001", "1", f)
+    assert df["pos"].to_list() == [20_000_000, 1_896_318] and df["cluster"].dtype == pl.Int64
+    f.write_text(head + row("1.5e+00") + "\n")
+    with pytest.raises(ValueError, match="non-integer"):
+        cm.read_one("LTX0001", "1", f)

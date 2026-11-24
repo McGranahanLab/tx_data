@@ -24,7 +24,7 @@ import polars as pl
 
 from tx_data.builds._base import canonical_output_path, log
 from tx_data.builds._wes_release_files import dash_sample, discover, tumour_id
-from tx_data.builds._wgs_tumour_files import read_tsv, require
+from tx_data.builds._wgs_tumour_files import r_int, read_tsv, require
 from tx_data.normalize import canonical_chr_expr
 from tx_data.sources import resolve_source
 
@@ -55,6 +55,7 @@ def _known_samples() -> set[tuple[str, str]] | None:
 def read_one(patient: str, n: str, path: Path) -> pl.DataFrame:
     muts = read_tsv(path)
     require(muts, SOURCE, path)
+    muts = r_int(muts, ("POS", "CLUSTER"), path)
     case = f"{patient}_{n}"
     if "CASE_ID" in muts.columns:
         bad = set(muts["CASE_ID"].drop_nulls()) - {case}
@@ -67,6 +68,7 @@ def read_one(patient: str, n: str, path: Path) -> pl.DataFrame:
     if tt_path.is_file():
         tt = read_tsv(tt_path)
         require(tt, ("mutation_id", "SAMPLE", "treeCLUSTER"), tt_path)
+        tt = r_int(tt, ("treeCLUSTER",), tt_path)
         tt = (tt.select(pl.col("mutation_id"), pl.col("SAMPLE").alias("sample"),
                         pl.col("treeCLUSTER").cast(pl.Int64).alias("tree_cluster"))
                 .with_columns(dash_sample()).unique(["mutation_id", "sample"]))
@@ -87,7 +89,10 @@ def build() -> pl.DataFrame:
     for patient, n, path in files:
         if not resolve_source(TABLE, pattern_key=TREE_TABLE_PATTERN, patient_id=patient, tumour_n=n).is_file():
             no_tree.append(f"{patient}_{n}")
-        frames.append(read_one(patient, n, path))
+        try:
+            frames.append(read_one(patient, n, path))
+        except Exception as e:
+            raise ValueError(f"{TABLE}: failed reading {path}: {e}") from e
     log(f"{TABLE}: read {len(frames)} WES tumours")
     if no_tree:
         log(f"warning: {TABLE}: no treeTable.tsv for {len(no_tree)} tumour(s), tree_cluster null: {no_tree}")

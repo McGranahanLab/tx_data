@@ -60,6 +60,17 @@ def require(df: pl.DataFrame, cols, path: Path) -> None:
         raise ValueError(f"{path}: missing required columns {missing}")
 
 
+def r_int(df: pl.DataFrame, cols, path: Path) -> pl.DataFrame:
+    """Integer columns written by R, which may use scientific notation (`2e+07` for 20000000, Nemo
+    2026-11-24): parse as float, check every value is whole, cast to Int64. A fractional value fails."""
+    out = df.with_columns(pl.col(c).cast(pl.Float64) for c in cols)
+    for c in cols:
+        bad = out.filter(pl.col(c).is_not_null() & (pl.col(c) != pl.col(c).round(0)))[c]
+        if bad.len():
+            raise ValueError(f"{path}: column {c} has non-integer values {bad.unique().to_list()[:5]}")
+    return out.with_columns(pl.col(c).cast(pl.Int64) for c in cols)
+
+
 def r_bool(col: str) -> pl.Expr:
     """R logicals (`TRUE`/`FALSE`, also `1`/`0`); anything else → null."""
     v = pl.col(col).str.to_uppercase()

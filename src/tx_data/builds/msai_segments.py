@@ -25,6 +25,7 @@ import polars as pl
 
 from tx_data.builds._base import canonical_output_path, log
 from tx_data.builds._wes_release_files import dash_sample
+from tx_data.builds._wgs_tumour_files import r_int
 from tx_data.normalize import canonical_chr_expr
 from tx_data.sources import resolve_source
 
@@ -65,12 +66,14 @@ def read_one(tumour_id: str, path: Path) -> pl.DataFrame:
         bad = set(df["tumour_id"].drop_nulls()) - {tumour_id}
         if bad:
             raise ValueError(f"{path}: tumour_id {sorted(bad)} does not match the folder ({tumour_id})")
-    parts = pl.col("segment").str.split("_")
+    df = df.with_columns(pl.col("segment").str.split("_").list.to_struct(fields=["_chr", "_start", "_end"])
+                           .alias("_seg")).unnest("_seg")
+    df = r_int(df, ("_start", "_end"), path)
     a, b = pl.col("cpnA").cast(pl.Float64), pl.col("cpnB").cast(pl.Float64)
     return df.select(
         pl.lit(tumour_id).alias("tumour_id"), pl.lit(tumour_id.split("-")[0]).alias("patient_id"),
-        pl.col("sample"), parts.list.get(0).alias("chr"), parts.list.get(1).cast(pl.Int64).alias("start"),
-        parts.list.get(2).cast(pl.Int64).alias("end"), a.alias("cn_a"), b.alias("cn_b"),
+        pl.col("sample"), pl.col("_chr").alias("chr"), pl.col("_start").alias("start"),
+        pl.col("_end").alias("end"), a.alias("cn_a"), b.alias("cn_b"),
         pl.max_horizontal(a, b).alias("cn_major"), pl.min_horizontal(a, b).alias("cn_minor"),
         (a + b).alias("cn_total"),
     ).with_columns(dash_sample(), canonical_chr_expr("chr"))
@@ -78,7 +81,12 @@ def read_one(tumour_id: str, path: Path) -> pl.DataFrame:
 
 def build() -> pl.DataFrame:
     files = discover()
-    frames = [read_one(t, f) for t, f in files]
+    frames = []
+    for t, f in files:
+        try:
+            frames.append(read_one(t, f))
+        except Exception as e:
+            raise ValueError(f"{TABLE}: failed reading {f}: {e}") from e
     log(f"{TABLE}: read {len(frames)} WES tumours")
     df = (pl.concat(frames, how="diagonal_relaxed").select([pl.col(c).cast(t) for c, t in SCHEMA.items()])
           if frames else pl.DataFrame(schema=SCHEMA))

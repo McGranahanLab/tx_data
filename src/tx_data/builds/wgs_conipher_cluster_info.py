@@ -11,7 +11,7 @@ from pathlib import Path
 
 import polars as pl
 
-from tx_data.builds._wgs_tumour_files import ID_COLS, build_per_tumour, r_bool, read_tsv, require, sample_hash
+from tx_data.builds._wgs_tumour_files import ID_COLS, build_per_tumour, r_bool, r_int, read_tsv, require, sample_hash
 
 TABLE = "wgs_conipher_cluster_info"
 SCHEMA = {**ID_COLS, "cluster_id": pl.Int64, "sample": pl.String, "sample_name_hash": pl.String,
@@ -21,6 +21,7 @@ SCHEMA = {**ID_COLS, "cluster_id": pl.Int64, "sample": pl.String, "sample_name_h
 def read_one(label: str, path: Path) -> pl.DataFrame:
     df = read_tsv(path)
     require(df, ("clusterID", "truncal", "treeClust", "meanCCF"), path)
+    df = r_int(df, ("clusterID",), path)
     sample = pl.col("SAMPLE") if "SAMPLE" in df.columns else pl.lit(None, pl.String)
     return (df.with_columns(r_bool("truncal"), r_bool("treeClust"))
               .select(pl.col("clusterID").cast(pl.Int64).alias("cluster_id"), sample.alias("sample"),

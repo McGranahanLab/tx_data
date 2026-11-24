@@ -58,8 +58,13 @@ def build_per_tumour(table: str, schema: dict, read_one: Callable[[str, str, Pat
     """Read every discovered tumour with `read_one(patient, n, path)` (frame without the id columns),
     attach tumour_id / patient_id, check the schema, write the canonical parquet."""
     files = discover(table)
-    frames = [read_one(p, n, f).with_columns(pl.lit(tumour_id(p, n)).alias("tumour_id"),
-                                             pl.lit(p).alias("patient_id")) for p, n, f in files]
+    frames = []
+    for p, n, f in files:
+        try:
+            frames.append(read_one(p, n, f).with_columns(pl.lit(tumour_id(p, n)).alias("tumour_id"),
+                                                         pl.lit(p).alias("patient_id")))
+        except Exception as e:
+            raise ValueError(f"{table}: failed reading {f}: {e}") from e
     log(f"{table}: read {len(frames)} WES tumours")
     if frames:
         df = pl.concat(frames, how="diagonal_relaxed").select([pl.col(c).cast(t) for c, t in schema.items()])

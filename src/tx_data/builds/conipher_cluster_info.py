@@ -13,7 +13,7 @@ from pathlib import Path
 import polars as pl
 
 from tx_data.builds._wes_release_files import ID_COLS, build_per_tumour, dash_sample
-from tx_data.builds._wgs_tumour_files import r_bool, read_tsv, require
+from tx_data.builds._wgs_tumour_files import r_bool, r_int, read_tsv, require
 
 TABLE = "conipher_cluster_info"
 SCHEMA = {**ID_COLS, "cluster_id": pl.Int64, "sample": pl.String, "truncal": pl.Boolean, "tree_clust": pl.Boolean,
@@ -23,6 +23,7 @@ SCHEMA = {**ID_COLS, "cluster_id": pl.Int64, "sample": pl.String, "truncal": pl.
 def read_one(patient: str, n: str, path: Path) -> pl.DataFrame:
     df = read_tsv(path)
     require(df, ("clusterID", "truncal", "treeClust", "meanCCF"), path)
+    df = r_int(df, ("clusterID",), path)
     sample = pl.col("SAMPLE") if "SAMPLE" in df.columns else pl.lit(None, pl.String)
     return (df.with_columns(r_bool("truncal"), r_bool("treeClust"))
               .select(pl.col("clusterID").cast(pl.Int64).alias("cluster_id"), sample.alias("sample"),
