@@ -36,16 +36,10 @@ columns:
   derived: true
 - name: sample
   type: VARCHAR
-  description: Source `SAMPLE` verbatim; the key into treeTable.tsv and the form WGD step 00 matches against the
-    MSAI segments.
+  description: Sample name in the form used across tx_data (`LTX0001_SU_T1-R1--<hash>`, = clone_proportions
+    `sample_id`), converted from the R-style source SAMPLE (`LTX0001_SU_T1.R1..<hash>`; `..` -> `--`, `.` -> `-`;
+    Piotr, 2026-11-24). treeTable SAMPLE is converted the same way before the join.
   null_semantics: not_applicable
-  derived: false
-- name: sample_id
-  type: VARCHAR
-  description: clone_proportions `sample_id` (`LTX0001_SU_T1-R1--<hash>`) matched to `sample` within the tumour,
-    ignoring punctuation (SCoutput may write R-style `LTX0001_SU_T1.R1..<hash>`); null if unmatched or if
-    clone_proportions is not built.
-  null_semantics: missing_on_source
   derived: true
 - name: chr
   type: VARCHAR
@@ -69,7 +63,8 @@ columns:
   derived: false
 - name: mutation_id
   type: VARCHAR
-  description: CONIPHER mutation_id (key into treeTable).
+  description: CONIPHER mutation_id verbatim (key into treeTable); on the real files without a patient prefix
+    (`:1:1896318:C:T`, Piotr 2026-11-24), so unique only within a tumour.
   null_semantics: not_applicable
   derived: false
 - name: cluster
@@ -104,14 +99,10 @@ columns:
   null_semantics: missing_on_source
   derived: false
 relationships:
-  - column: [tumour_id, sample_id]
+  - column: [tumour_id, sample]
     references: [clone_proportions.tumour_id, clone_proportions.sample_id]
 
 scope_notes: |
-  WGS counterpart: wgs_conipher_mutations (same columns except wgs_tumour_label / sample_name_hash;
-  sample_id here). Only SCoutput.CLEAN is read; DIRTY / FULL in the same folder are not.
+  WGS counterpart: wgs_conipher_mutations (same columns except wgs_tumour_label / sample_name_hash). Only SCoutput.CLEAN is read; DIRTY / FULL in the same folder are not.
 
-open_questions:
-- 'SAMPLE form on the real files: the pasted example looked R-mangled (`LTX0001_SU_T1.R1..<hash>`); check it
-  equals the MSAI segments'' SAMPLE (WGD step 00 requires the same ids in both).'
-- 'mutation_id form: the pasted example started with `:1:1896318` (no patient prefix?); check on Nemo.'
+open_questions: []

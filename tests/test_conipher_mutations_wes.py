@@ -47,17 +47,15 @@ def test_tree_cluster_off_tree_and_no_tree(built):
             assert g["tree_cluster"].null_count() == g.height     # no treeTable.tsv: whole tumour null
 
 
-def test_sample_id_matches_clone_proportions(built):
-    """R-style SAMPLE (`.`/`..`) is matched to the cp_table hash form; tumours without ALPACA stay null."""
+def test_sample_converted_to_dash_form(built):
+    """R-style SAMPLE (`.`/`..`) becomes the cp_table form (`-`/`--`) in both SCoutput and treeTable."""
     m, cp = built
-    assert m["sample"].str.contains("--").sum() == 0
+    assert m["sample"].str.contains(r"\.").sum() == 0
     with_cp = set(cp["tumour_id"])
-    matched = m.filter(pl.col("tumour_id").is_in(with_cp))
-    assert matched["sample_id"].null_count() == 0
-    pairs = set(matched.select("tumour_id", "sample_id").unique().iter_rows())
-    assert pairs <= set(cp.select("tumour_id", "sample_id").unique().iter_rows())
-    assert m.filter(~pl.col("tumour_id").is_in(with_cp))["sample_id"].null_count() == \
-        m.filter(~pl.col("tumour_id").is_in(with_cp)).height
+    pairs = set(m.filter(pl.col("tumour_id").is_in(with_cp)).select("tumour_id", "sample").unique().iter_rows())
+    assert pairs == set(cp.filter(pl.col("tumour_id").is_in(set(m["tumour_id"])))
+                          .select("tumour_id", "sample_id").unique().iter_rows())
+    assert m.filter(pl.col("tumour_id") == "LTX0005-Tumour1", pl.col("cluster") != 6)["tree_cluster"].null_count() == 0
 
 
 def test_clonal_gd_truncal_mut_copy(built):
@@ -75,4 +73,4 @@ def test_case_id_mismatch_fails(tmp_path, monkeypatch):
     f.write_text("\t".join(("CASE_ID", *cm.SOURCE)) + "\n" + "\t".join(("LTX0002_1", "S", "1", "10", "A", "C",
                                                                          "m", "1", "1", "1", "1")) + "\n")
     with pytest.raises(ValueError, match="CASE_ID"):
-        cm.read_one("LTX0001", "1", f, {})
+        cm.read_one("LTX0001", "1", f)

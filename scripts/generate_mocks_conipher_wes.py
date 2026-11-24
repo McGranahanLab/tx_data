@@ -5,8 +5,9 @@ Per tumour of the WES cohort manifest (nemo_mock/_cohort_manifest.json):
   release_tx842/<patient>/mutation_trees/tumour_<n>/treeTable.tsv          (tumours with a tree only)
 
 Clusters are the manifest's tree clones plus its non-tree clusters (left out of treeTable). SAMPLE is
-written R-style (`LTX0001_SU_T1.R1..<hash>`), as in the CONIPHER RDS mock, so the build's sample_id
-matching is exercised. Truncal mutations sit at 2 copies on 2|2 in tumours with a clonal GD. Deterministic.
+written R-style (`LTX0001_SU_T1.R1..<hash>`) and mutation_id without a patient prefix, as on Nemo, so the
+build's conversion to the dash form is exercised. Truncal mutations sit at 2 copies on 2|2 in tumours with a
+clonal GD. Deterministic.
 
   python scripts/generate_mocks_conipher_wes.py
 """
@@ -45,7 +46,7 @@ def main() -> None:
             for _ in range(N_MUTS_PER_CLUSTER):
                 chrom, pos = str(rng.randint(1, 22)), rng.randint(1_000_000, 50_000_000)
                 ref, alt = rng.sample("ACGT", 2)
-                mid = f"{patient}:{chrom}:{pos}:{ref}:{alt}"
+                mid = f":{chrom}:{pos}:{ref}:{alt}"   # real form: no patient prefix
                 for s in samples:
                     cn = 2 if clonal_gd else 1
                     mut_copy = 2 if clonal_gd and cl == 1 else 1
