@@ -70,6 +70,10 @@ TABLES = (
     # trees (ALPACA input), cohort facts, chromosome lengths (2026-11-19)
     "alpaca_trees",
     "wgs_alpaca_trees",
+    # single-sample / single-clone tumours per cohort (Piotr, 2026-11-25); after the cp_table and CONIPHER
+    # tables they count from, before cohort_metadata, which summarises them
+    "sample_clone_counts",
+    "wgs_sample_clone_counts",
     "cohort_metadata",
     # chr_table emits TWO parquets (chr_table_hg19, chr_table_hg38)
     "chr_table",

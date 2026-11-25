@@ -1,0 +1,69 @@
+# Catalog: sample_clone_counts (WES). Added 2026-11-25.
+name: sample_clone_counts
+cohort: wes
+description: 'Per WES tumour: number of samples and clones, and whether it is single-sample, single-clone or both. Such
+  tumours can behave unusually (an analysis designed for multi-sample or multi-clone tumours may fail on them; Piotr,
+  2026-11-25). Derived in tx_data, no source file of its own.'
+provenance:
+  derived_from:
+  - clone_proportions
+  - conipher_mutations
+  - conipher_tree_edges
+  derivation: 'cp_table (clone_proportions): samples = distinct sample_id, clones = distinct clone. Tumours absent from
+    clone_proportions (e.g. not run through ALPACA): samples from conipher_mutations, clones from the default tree in
+    conipher_tree_edges (a 1 -> 1 self-loop is one clone).'
+  requested_by: Piotr (Slack DM, 2026-11-25)
+  canonical_format: Parquet (after build script)
+primary_key:
+- tumour_id
+grain: one row per tumour
+columns:
+- name: tumour_id
+  type: VARCHAR
+  description: Canonical tumour ID (`LTX0001-Tumour1`).
+  null_semantics: not_applicable
+  derived: false
+- name: n_samples
+  type: BIGINT
+  description: Number of samples (cp_table sample columns, else distinct CONIPHER samples).
+  null_semantics: not_applicable
+  derived: true
+- name: n_clones
+  type: BIGINT
+  description: Number of clones (cp_table rows, else clusters of the default CONIPHER tree); null if neither is available.
+  null_semantics: missing_on_source
+  derived: true
+- name: single_sample
+  type: BOOLEAN
+  description: n_samples == 1.
+  null_semantics: not_applicable
+  derived: true
+- name: single_clone
+  type: BOOLEAN
+  description: n_clones == 1; null if n_clones is null.
+  null_semantics: missing_on_source
+  derived: true
+- name: category
+  type: VARCHAR
+  description: single_sample_single_clone, single_sample, single_clone, multi_sample_multi_clone, or clones_unknown (CONIPHER
+    tumour without a tree).
+  null_semantics: not_applicable
+  derived: true
+- name: in_cp_table
+  type: BOOLEAN
+  description: True if the tumour has a cp_table (clone_proportions); false = counted from CONIPHER (no ALPACA input).
+  null_semantics: not_applicable
+  derived: true
+- name: source
+  type: VARCHAR
+  description: 'cp_table or conipher: where the counts came from.'
+  null_semantics: not_applicable
+  derived: true
+relationships:
+- column: tumour_id
+  references: clone_proportions.tumour_id
+scope_notes: 'cohort_metadata summarises this table: fields single_sample_tumours, single_clone_tumours, single_sample_single_clone_tumours
+  (value = count, note = tumour ids). WES and WGS differ because different samples were sequenced.
+
+  '
+open_questions: []
