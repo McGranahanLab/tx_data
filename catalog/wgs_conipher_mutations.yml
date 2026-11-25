@@ -2,7 +2,7 @@
 name: wgs_conipher_mutations
 cohort: wgs
 description: CONIPHER mutations of each WGS tumour (2026_08_mean_max_absent run), one row per mutation x sample,
-  with the tree cluster from treeTable.tsv. Input of the WGD pipeline's step 00 (PGDD input) through WGD_WGS_pipeline
+  with the tree cluster from treeTable.tsv. Input of the WGD pipeline's step 00 (PGDD input) through WGD_pipeline (config.wgs.toml)
   (Piotr, 2026-11-17).
 provenance:
   cohort: TRACERx WGS
@@ -12,7 +12,7 @@ provenance:
   received: '2026-11-17'
   received_via: 'Piotr (Slack DM): paths, folder listings; formats as WES'
   canonical_format: Parquet (after build script)
-  consumer: darwins_analysis WGD_WGS_pipeline
+  consumer: darwins_analysis WGD_pipeline (config.wgs.toml)
 primary_key:
 - tumour_id
 - mutation_id

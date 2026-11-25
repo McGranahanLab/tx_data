@@ -1,14 +1,15 @@
 """Build wgs_wgd_calls → canonical Parquet.
 
-Per-clone WGD calls for the WGS cohort, from darwins_analysis `WGD_WGS_pipeline` (step 05
+Per-clone WGD calls for the WGS cohort, from darwins_analysis `WGD_pipeline` with `config.wgs.toml` (step 05
 `wgd_calls.tsv`: every call, with `quality_pass` for the quality cut-off; Piotr, 2026-11-19). Same
 derived columns as the WES `wgd_calls` (`tx_data.builds.wgd_calls.add_derived`); they are null on rows
 without calls (status `qc_failed` / `no_alpaca_tree`).
 
 Where the pipeline output lives is a build parameter, as for `alpaca_corrected` (nothing hardcoded):
 `build(source_dir=...)`, `scripts/build_wgs_wgd_calls.py --source-dir <run>/wgd/05_table`, or the
-environment variable TX_WGS_WGD_CALLS_DIR (used by build_all). Without one, the `_sources.yml` entry
-(mock layout in nemo_mock/) is used.
+environment variable TX_WGS_WGD_CALLS_DIR (used by build_all), e.g.
+`<darwins_analysis>/WGD_pipeline/output/wgs/wgd/05_table`. Without one, the `_sources.yml` entry (mock layout in
+nemo_mock/ only; there is no such folder on Nemo) is used, and a clear error says what to set if it is absent.
 """
 
 from __future__ import annotations
@@ -41,7 +42,16 @@ SCHEMA = {**SOURCE_SCHEMA, **DERIVED}
 
 def _source(source_dir: Path | None) -> Path:
     d = source_dir or (Path(os.environ[ENV_DIR]) if os.environ.get(ENV_DIR) else None)
-    return Path(d) / "wgd_calls.tsv" if d is not None else resolve_source(TABLE)
+    if d is not None:
+        return Path(d) / "wgd_calls.tsv"
+    p = resolve_source(TABLE)              # mock layout only
+    if not p.is_file():
+        raise FileNotFoundError(
+            f"{TABLE}: no pipeline output given and the mock-layout default {p} does not exist. Point the build at "
+            f"the WGS run of darwins_analysis WGD_pipeline: {ENV_DIR}=<darwins_analysis>/WGD_pipeline/<[run].out_dir "
+            f"of config.wgs.toml, default output/wgs>/wgd/05_table (or --source-dir). Run the pipeline first: it "
+            f"reads the tx_data WGS tables, so this table is built after it.")
+    return p
 
 
 def read_calls(path: Path) -> pl.DataFrame:
@@ -49,7 +59,7 @@ def read_calls(path: Path) -> pl.DataFrame:
                      schema_overrides={c: t for c, t in SOURCE_SCHEMA.items() if t == pl.String})
     missing = [c for c in SOURCE_SCHEMA if c not in df.columns]
     if missing:
-        raise ValueError(f"{path}: missing columns {missing} (WGD_WGS_pipeline step 05 from 2026-11-19 on)")
+        raise ValueError(f"{path}: missing columns {missing} (WGD_pipeline step 05 from 2026-11-19 on)")
     df = df.select(pl.col(c).cast(t, strict=True) for c, t in SOURCE_SCHEMA.items())
     dup = df.filter(pl.col("clone").is_not_null() & pl.struct("tumour_id", "clone").is_duplicated())
     if dup.height:

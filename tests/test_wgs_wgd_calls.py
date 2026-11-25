@@ -1,4 +1,4 @@
-"""wgs_wgd_calls (WGD_WGS_pipeline output) on the mock, and the --source-dir parameter."""
+"""wgs_wgd_calls (WGD_pipeline WGS output) on the mock, and the --source-dir parameter."""
 
 from __future__ import annotations
 
@@ -44,3 +44,13 @@ def test_source_dir_parameter(tmp_path, built):
     with pytest.raises(ValueError, match="quality_pass"):
         wgs_wgd_calls.build(tmp_path)
     wgs_wgd_calls.build()  # restore data/ from the mock
+
+
+def test_missing_default_says_what_to_set(tmp_path, monkeypatch):
+    """Nemo 2026-11-25: on prod the mock-layout default doesn't exist; the error names TX_WGS_WGD_CALLS_DIR."""
+    from tx_data.builds import wgs_wgd_calls as w
+
+    monkeypatch.delenv(w.ENV_DIR, raising=False)
+    monkeypatch.setenv("TX_NEMO_ROOT", str(tmp_path))
+    with pytest.raises(FileNotFoundError, match="TX_WGS_WGD_CALLS_DIR=<darwins_analysis>/WGD_pipeline"):
+        w._source(None)

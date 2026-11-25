@@ -26,7 +26,7 @@ wgs:
   conipher_run: /nemo/project/proj-tracerx-wgs/working/grimesk/CONIPHERwgs/2026_08_mean_max_absent/runs/cleaning_noisefloor_artefact/snv
   trees: ALPACA input tree_paths.json (wgs_alpaca_trees); not CONIPHER's alternative trees
   clone_copy_number: ALPACA (wgs_alpaca, alpaca/output/tumour_results/<label>/)
-  wgd_calls: darwins_analysis WGD_WGS_pipeline (wgs_wgd_calls)
+  wgd_calls: darwins_analysis WGD_pipeline, config.wgs.toml (wgs_wgd_calls)
   pgdd_thresholds: WGS-scale, discover_num_muts 100, discover_num_2_cpn_muts 50, check_num_2_cpn_muts 30 (Piotr, 2026-11-19)
   manual_qc_table: the WES table (every WGS tumour is in the WES cohort)
   chromosome_lengths: chr_table_hg38

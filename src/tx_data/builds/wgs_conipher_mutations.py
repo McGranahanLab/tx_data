@@ -3,7 +3,7 @@
 CONIPHER mutations of each WGS tumour, from the 2026_08_mean_max_absent run (Piotr, 2026-11-17):
 `<label>/<label>.SCoutput.CLEAN.tsv` (one row per mutation × sample) joined with
 `<label>/treeTable.tsv` on (mutation_id, SAMPLE) for the tree cluster. Same shape as the WES
-CONIPHER output. Input of the WGD pipeline's step 00 (PGDD input), via WGD_WGS_pipeline.
+CONIPHER output. Input of the WGD pipeline's step 00 (PGDD input), via WGD_pipeline (config.wgs.toml).
 
 Kept: the columns step 00 reads (renamed to snake case) plus PLOIDY when present.
 `tree_cluster` is null for mutations treeTable leaves out (clusters not on the tree).

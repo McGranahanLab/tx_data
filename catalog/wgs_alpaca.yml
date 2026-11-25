@@ -10,7 +10,7 @@ provenance:
   received: '2026-11-17'
   received_via: 'Piotr (Slack DM): paths, folder listings; formats as WES'
   canonical_format: Parquet (after build script)
-  consumer: darwins_analysis WGD_WGS_pipeline
+  consumer: darwins_analysis WGD_pipeline (config.wgs.toml)
 primary_key:
 - tumour_id
 - segment
