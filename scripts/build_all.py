@@ -79,6 +79,8 @@ TABLES = (
     "chr_table",
     # WGD_pipeline WGS output (run the pipeline first); location from TX_WGS_WGD_CALLS_DIR (else the mock)
     "wgs_wgd_calls",
+    # WGS ALPACA correction (WGD_pipeline WGS run, correct step); TX_WGS_ALPACA_CORRECTED_DIR (else the mock)
+    "wgs_alpaca_corrected",
 )
 
 # Extra parquet names a builder may emit in addition to `<table>.parquet`.
@@ -89,6 +91,7 @@ EXTRA_OUTPUTS: dict[str, tuple[str, ...]] = {
     "kallisto": ("kallisto_paired_normals",),
     "conipher_trees": ("conipher_ccf", "conipher_clonality"),
     "chr_table": ("chr_table_hg19", "chr_table_hg38"),
+    "wgs_alpaca_corrected": ("wgs_alpaca_wgd_ratios_corrected",),
 }
 # Builders with no parquet named after them: their primary output.
 PRIMARY_OUTPUT = {"conipher_trees": "conipher_ccf", "chr_table": "chr_table_hg19"}
