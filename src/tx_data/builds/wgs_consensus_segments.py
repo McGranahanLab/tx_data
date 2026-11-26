@@ -32,7 +32,7 @@ from __future__ import annotations
 import polars as pl
 
 from tx_data import wgs_samples
-from tx_data.builds._base import canonical_output_path, log
+from tx_data.builds._base import Issues, canonical_output_path, log
 from tx_data.builds._wgs_tumour_files import r_int
 from tx_data.sources import resolve_source
 
@@ -100,6 +100,8 @@ def build() -> pl.DataFrame:
     wgs_samples.clear_cache()
     tumours = wgs_samples.tumours()
 
+    issues = Issues(TABLE)
+    tid = dict(tumours.select("wgs_tumour_label", "tumour_id").iter_rows())
     frames: list[pl.DataFrame] = []
     absent: list[str] = []
     not_adjusted: list[str] = []
@@ -109,16 +111,23 @@ def build() -> pl.DataFrame:
         if adjusted.is_file():
             if single.is_file():
                 log(f"note: {label} has both MSAI-adjusted and NOT_adjusted files; using adjusted")
-            frames.append(_read_one(label, adjusted, True))
+            try:
+                frames.append(_read_one(label, adjusted, True))
+            except Exception as e:
+                issues.add(tid[label], "skipped", f"unreadable: {type(e).__name__}: {e}", adjusted)
         elif single.is_file():
             not_adjusted.append(label)
-            frames.append(_read_one(label, single, False))
+            try:
+                frames.append(_read_one(label, single, False))
+            except Exception as e:
+                issues.add(tid[label], "skipped", f"unreadable: {type(e).__name__}: {e}", single)
         else:
             absent.append(label)
     log(f"read segments for {len(frames)}/{tumours.height} WGS tumours "
         f"({len(frames) - len(not_adjusted)} MSAI-adjusted, {len(not_adjusted)} NOT_adjusted)")
-    if absent:
-        log(f"warning: no segments file (adjusted or NOT_adjusted) for {len(absent)} tumour(s): {absent}")
+    for label in absent:
+        issues.add(tid[label], "skipped", f"no segments file (MSAI adjusted or NOT_adjusted) for WGS label {label}",
+                   resolve_source(TABLE, wgs_tumour_label=label))
 
     if not frames:
         df = pl.DataFrame(schema=SCHEMA)
@@ -178,6 +187,7 @@ def build() -> pl.DataFrame:
     out = canonical_output_path(TABLE)
     df.write_parquet(out)
     log(f"wrote {out} ({df.height} rows × {df.width} cols)")
+    issues.write()
     return df
 
 

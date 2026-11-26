@@ -15,7 +15,7 @@ from pathlib import Path
 
 import polars as pl
 
-from tx_data.builds._base import canonical_output_path, log
+from tx_data.builds._base import Issues, canonical_output_path, log
 from tx_data.sources import resolve_source
 
 TABLE = "clone_proportions"
@@ -73,12 +73,13 @@ def build() -> pl.DataFrame:
     files = _discover_cp_files()
     log(f"clone_proportions: found {len(files)} tumour cp_table.csv files")
 
+    issues = Issues(TABLE)
     frames: list[pl.DataFrame] = []
     for tumour_id, path in files:
         try:
             frames.append(_read_cp_table(tumour_id, path))
         except Exception as e:
-            log(f"clone_proportions: skipping {tumour_id}: {e}")
+            issues.add(tumour_id, "skipped", f"unreadable: {type(e).__name__}: {e}", path)
 
     if not frames:
         df = pl.DataFrame(
@@ -95,6 +96,7 @@ def build() -> pl.DataFrame:
     out = canonical_output_path(TABLE)
     df.write_parquet(out)
     log(f"wrote {out} ({df.height} rows × {df.width} cols)")
+    issues.write()
     return df
 
 
