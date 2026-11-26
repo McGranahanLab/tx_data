@@ -72,7 +72,8 @@ def build(source_dir: Path | None = None) -> pl.DataFrame:
 
 
 def build_table(table: str, src: Path) -> pl.DataFrame:
-    """Step 05 wgd_calls.tsv of a WGD_pipeline run -> canonical Parquet `table` (WGS or WES)."""
+    """Step 05 wgd_calls.tsv of a WGD_pipeline run -> canonical Parquet `table` (WGS or WES), plus the same
+    table as data/<table>.tsv (tab-separated, NA for missing)."""
     log(f"read {src}")
     df = read_calls(src, table)
     calls = df.filter(~pl.col("status").is_in(list(NO_CALLS)) & pl.col("clone").is_not_null())
@@ -88,6 +89,9 @@ def build_table(table: str, src: Path) -> pl.DataFrame:
     out = canonical_output_path(table)
     df.write_parquet(out)
     log(f"wrote {out} ({df.height} rows × {df.width} cols)")
+    tsv = out.with_suffix(".tsv")            # also as TSV, for use outside Python (Piotr, 2026-11-26)
+    df.write_csv(tsv, separator="\t", null_value="NA")
+    log(f"wrote {tsv}")
     return df
 
 

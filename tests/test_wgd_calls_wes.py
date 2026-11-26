@@ -38,3 +38,19 @@ def test_source_dir_and_env(tmp_path, monkeypatch, built):
     monkeypatch.setenv("TX_NEMO_ROOT", str(tmp_path / "nowhere"))
     with pytest.raises(FileNotFoundError, match="TX_WES_WGD_CALLS_DIR=<darwins_analysis>/WGD_pipeline/.*output/wes"):
         w.build()
+
+
+@pytest.mark.parametrize("table", ["wgd_calls", "wgs_wgd_calls"])
+def test_tsv_copy(table, monkeypatch):
+    """2026-11-26 (Piotr): both WGD call tables are also written as data/<table>.tsv, same content."""
+    from tx_data.builds import BUILDERS
+    from tx_data.builds._base import canonical_output_path
+
+    monkeypatch.delenv("TX_NEMO_ROOT", raising=False)
+    monkeypatch.delenv("TX_WES_WGD_CALLS_DIR", raising=False)
+    monkeypatch.delenv("TX_WGS_WGD_CALLS_DIR", raising=False)
+    df = BUILDERS[table]()
+    tsv = pl.read_csv(canonical_output_path(table).with_suffix(".tsv"), separator="\t", null_values=["NA"],
+                      infer_schema_length=None)
+    assert tsv.columns == df.columns and tsv.height == df.height
+    assert tsv["tumour_id"].to_list() == df["tumour_id"].to_list()
