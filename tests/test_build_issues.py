@@ -11,6 +11,14 @@ from tx_data.builds._base import ISSUES_DIR
 @pytest.fixture
 def mock_root(monkeypatch):
     monkeypatch.delenv("TX_NEMO_ROOT", raising=False)
+    yield
+    # the tests below write tables with a tumour deliberately missing; rebuild them so data/ stays whole
+    from tx_data.builds import BUILDERS
+
+    monkeypatch.undo()
+    monkeypatch.delenv("TX_NEMO_ROOT", raising=False)
+    for t in ("conipher_mutations", "msai_segments", "conipher_cluster_info"):
+        BUILDERS[t]()
 
 
 def _issues(table: str) -> pl.DataFrame:
