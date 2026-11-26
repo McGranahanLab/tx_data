@@ -13,7 +13,7 @@ provenance:
   format_on_source: TSV, header row
   received: '2026-11-19'
   received_via: darwins_analysis WGD_WGS_pipeline (now WGD_pipeline, config.wgs.toml)
-  canonical_format: Parquet (after build script)
+  canonical_format: Parquet (after build script); also written as data/<table>.tsv (tab-separated, NA for missing; Piotr, 2026-11-26)
   pipeline: 'WGD_pipeline (config.wgs.toml): PGDD (WGS thresholds) -> WGD steps 00-05'
 primary_key:
 - tumour_id
