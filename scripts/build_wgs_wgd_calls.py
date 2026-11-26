@@ -1,6 +1,6 @@
 """Entry point: build canonical wgs_wgd_calls Parquet.
 
-  python scripts/build_wgs_wgd_calls.py [--source-dir <WGD_WGS_pipeline run>/wgd/05_table]
+  python scripts/build_wgs_wgd_calls.py [--source-dir <WGD_pipeline WGS run, default output/wgs>/wgd/05_table]
 
 Without --source-dir: $TX_WGS_WGD_CALLS_DIR, else the _sources.yml (mock) location.
 """

@@ -551,7 +551,7 @@ sources:
     received_via: Piotr (Slack DM) supplied the run path and folder listing; shape as the WES CONIPHER output
     notes: |
       SCoutput.CLEAN.tsv (mutation x sample) joined with treeTable.tsv (mutation_id, SAMPLE,
-      treeCLUSTER) from the same folder. Input of WGD step 00 (WGD_WGS_pipeline).
+      treeCLUSTER) from the same folder. Input of WGD step 00 (WGD_pipeline, WGS config).
 
   wgs_conipher_tree_edges:
     cohort: wgs
@@ -664,13 +664,14 @@ sources:
       UCSC chrom.sizes (chrom, length), all contigs; the build keeps 1-22, X, Y.
   wgs_wgd_calls:
     cohort: wgs
-    # Mock layout only. The real location is a build parameter (as for alpaca_corrected): --source-dir
-    # <WGD_WGS_pipeline run>/wgd/05_table or TX_WGS_WGD_CALLS_DIR (src/tx_data/builds/wgs_wgd_calls.py).
+    # Mock layout only: nothing is written to this folder on Nemo (WGD_WGS_pipeline is the old pipeline name).
+    # The real location is a build parameter (as for alpaca_corrected): TX_WGS_WGD_CALLS_DIR or --source-dir
+    # <darwins_analysis>/WGD_pipeline/output/wgs/wgd/05_table (src/tx_data/builds/wgs_wgd_calls.py).
     relative_path: WGD/WGD_WGS_pipeline/05_table/wgd_calls.tsv
     format: tsv
     header: true
     received: 2026-11-19
-    received_via: darwins_analysis WGD_WGS_pipeline (Piotr's request, 2026-11-19)
+    received_via: darwins_analysis WGD_WGS_pipeline, now WGD_pipeline (Piotr's request, 2026-11-19)
     notes: |
       Step 05 wgd_calls.tsv of the WGS WGD pipeline: every call (quality_pass marks the ones passing
       the quality cut-off), QC columns, qc_failed / no_alpaca_tree rows with NA calls. The mock is that

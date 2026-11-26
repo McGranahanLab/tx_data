@@ -16,7 +16,7 @@ from pathlib import Path
 
 import polars as pl
 
-from tx_data.builds._base import canonical_output_path, log
+from tx_data.builds._base import Issues, canonical_output_path, log
 from tx_data.sources import resolve_source
 
 TABLE = "alpaca_wgd_ratios"
@@ -79,9 +79,13 @@ def build() -> pl.DataFrame:
     files = _discover()
     log(f"{TABLE}: found {len(files)} tumour wgd_ratio_scores.csv files")
 
+    issues = Issues(TABLE)
     frames: list[pl.DataFrame] = []
     for tumour_dir, path in files:
-        frames.append(read_wgd_ratio_file(path, tumour_dir))
+        try:
+            frames.append(read_wgd_ratio_file(path, tumour_dir))
+        except Exception as e:
+            issues.add(tumour_dir, "skipped", f"unreadable: {type(e).__name__}: {e}", path)
 
     df = (
         pl.concat(frames, how="vertical")
@@ -97,6 +101,7 @@ def build() -> pl.DataFrame:
     out = canonical_output_path(TABLE)
     df.write_parquet(out)
     log(f"wrote {out} ({df.height} rows × {df.width} cols)")
+    issues.write()
     return df
 
 

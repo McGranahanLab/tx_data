@@ -1,20 +1,20 @@
 # Catalog: wgs_wgd_calls (WGS). Added 2026-11-19.
 name: wgs_wgd_calls
 cohort: wgs
-description: Per-clone WGD calls for the TRACERx WGS cohort from darwins_analysis WGD_WGS_pipeline (PGDD -> WGD
+description: Per-clone WGD calls for the TRACERx WGS cohort from darwins_analysis WGD_pipeline, config.wgs.toml (PGDD -> WGD
   caller), every call kept with `quality_pass` for the quality cut-off (Piotr, 2026-11-19). Same derived columns
   as the WES `wgd_calls`; they are null on rows without calls (qc_failed, no_alpaca_tree). WES calls stay in `wgd_calls`
   (previous release table) until a WES pipeline exists.
 provenance:
   cohort: TRACERx WGS
   hpc_source: /nemo/project/proj-tracerx-lung/tctProjects/CN-CCF/wgs_resources/WGD/WGD_WGS_pipeline/05_table/wgd_calls.tsv
-  hpc_source_status: 'Mock layout only. The real location is a build parameter: --source-dir <WGD_WGS_pipeline run>/wgd/05_table
+  hpc_source_status: 'Mock layout only. The real location is a build parameter: --source-dir <WGD_pipeline WGS run, default output/wgs>/wgd/05_table
     or TX_WGS_WGD_CALLS_DIR (no fixed release path yet).'
   format_on_source: TSV, header row
   received: '2026-11-19'
-  received_via: darwins_analysis WGD_WGS_pipeline
+  received_via: darwins_analysis WGD_WGS_pipeline (now WGD_pipeline, config.wgs.toml)
   canonical_format: Parquet (after build script)
-  pipeline: 'WGD_WGS_pipeline: PGDD (WGS thresholds) -> WGD steps 00-05'
+  pipeline: 'WGD_pipeline (config.wgs.toml): PGDD (WGS thresholds) -> WGD steps 00-05'
 primary_key:
 - tumour_id
 - clone

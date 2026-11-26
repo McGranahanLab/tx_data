@@ -15,6 +15,7 @@ wes:
   wgd_calls: previous release table WGD/release_tx842/WGD_calls.tsv (wgd_calls); a WES WGD pipeline is TODO
   manual_qc_table: /nemo/project/proj-tracerx-lung/tracerx/_RELEASE/release_tx842/_aggregate/20250729_tx842_manual_qc_complete_post_refphase.tsv
   chromosome_lengths: chr_table_hg19
+  single_sample_or_clone: single-sample and/or single-clone tumours can behave unusually (an analysis designed for multi-sample or multi-clone tumours may fail on them); listed per tumour in sample_clone_counts (from cp_table, else CONIPHER) and counted in the computed *_tumours fields of this table (Piotr, 2026-11-25)
 wgs:
   name: TRACERx WGS
   assay: whole-genome sequencing (WGS)
@@ -26,7 +27,8 @@ wgs:
   conipher_run: /nemo/project/proj-tracerx-wgs/working/grimesk/CONIPHERwgs/2026_08_mean_max_absent/runs/cleaning_noisefloor_artefact/snv
   trees: ALPACA input tree_paths.json (wgs_alpaca_trees); not CONIPHER's alternative trees
   clone_copy_number: ALPACA (wgs_alpaca, alpaca/output/tumour_results/<label>/)
-  wgd_calls: darwins_analysis WGD_WGS_pipeline (wgs_wgd_calls)
+  wgd_calls: darwins_analysis WGD_pipeline, config.wgs.toml (wgs_wgd_calls)
   pgdd_thresholds: WGS-scale, discover_num_muts 100, discover_num_2_cpn_muts 50, check_num_2_cpn_muts 30 (Piotr, 2026-11-19)
   manual_qc_table: the WES table (every WGS tumour is in the WES cohort)
   chromosome_lengths: chr_table_hg38
+  single_sample_or_clone: single-sample and/or single-clone tumours can behave unusually (an analysis designed for multi-sample or multi-clone tumours may fail on them); listed per tumour in wgs_sample_clone_counts (from cp_table, else CONIPHER) and counted in the computed *_tumours fields of this table (Piotr, 2026-11-25)

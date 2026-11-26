@@ -20,7 +20,7 @@ from __future__ import annotations
 import polars as pl
 
 from tx_data import wgs_samples
-from tx_data.builds._base import canonical_output_path, log
+from tx_data.builds._base import Issues, canonical_output_path, log
 from tx_data.builds.clone_proportions import _read_cp_table
 from tx_data.sources import resolve_source
 
@@ -41,6 +41,8 @@ def build() -> pl.DataFrame:
     wgs_samples.clear_cache()
     tumours = wgs_samples.tumours()
 
+    issues = Issues(TABLE)
+    tid = dict(tumours.select("wgs_tumour_label", "tumour_id").iter_rows())
     frames: list[pl.DataFrame] = []
     absent: list[str] = []
     for label in tumours.get_column("wgs_tumour_label").to_list():
@@ -50,12 +52,14 @@ def build() -> pl.DataFrame:
             continue
         # WES reader melts to (tumour_id, clone, sample_id, proportion); its
         # tumour_id slot carries the label here and is replaced below.
-        frames.append(
-            _read_cp_table(label, path).rename({"tumour_id": "wgs_tumour_label"})
-        )
+        try:
+            frames.append(_read_cp_table(label, path).rename({"tumour_id": "wgs_tumour_label"}))
+        except Exception as e:
+            issues.add(tid[label], "skipped", f"unreadable: {type(e).__name__}: {e}", path)
     log(f"read cp_table for {len(frames)}/{tumours.height} WGS tumours")
-    if absent:
-        log(f"warning: no cp_table.csv for {len(absent)} tumour(s): {absent}")
+    for label in absent:
+        issues.add(tid[label], "skipped", f"no cp_table.csv for WGS label {label}",
+                   resolve_source(TABLE, wgs_tumour_label=label))
 
     if not frames:
         df = pl.DataFrame(schema=SCHEMA)
@@ -82,6 +86,7 @@ def build() -> pl.DataFrame:
     out = canonical_output_path(TABLE)
     df.write_parquet(out)
     log(f"wrote {out} ({df.height} rows × {df.width} cols)")
+    issues.write()
     return df
 
 

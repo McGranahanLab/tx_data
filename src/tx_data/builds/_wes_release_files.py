@@ -15,7 +15,7 @@ from pathlib import Path
 
 import polars as pl
 
-from tx_data.builds._base import canonical_output_path, log
+from tx_data.builds._base import Issues, canonical_output_path, log
 from tx_data.sources import resolve_source, source_entry
 
 TUMOUR_DIR = re.compile(r"tumour_(\d+)$")
@@ -26,8 +26,9 @@ def tumour_id(patient: str, n: str) -> str:
     return f"{patient}-Tumour{n}"
 
 
-def discover(table: str) -> list[tuple[str, str, Path]]:
-    """`[(patient_id, n, path), ...]` for every `<patient>/<folder>/tumour_<n>/` holding the table's file."""
+def discover(table: str, issues: Issues | None = None) -> list[tuple[str, str, Path]]:
+    """`[(patient_id, n, path), ...]` for every `<patient>/<folder>/tumour_<n>/` holding the table's file;
+    tumour folders without it are recorded in `issues` (skipped)."""
     pattern = source_entry(table)["relative_path_pattern"]
     depth = len(Path(pattern).parts)                 # {patient_id}/<folder>/tumour_{n}/<file>
     folder = Path(pattern).parts[1]
@@ -43,8 +44,11 @@ def discover(table: str) -> list[tuple[str, str, Path]]:
         patient, n = tdir.parts[-3], m.group(1)
         f = resolve_source(table, patient_id=patient, tumour_n=n)
         (found if f.is_file() else empty).append((patient, n, f))
-    if empty:
-        log(f"warning: {table}: file missing in {len(empty)} tumour folder(s): {[f'{p}_{n}' for p, n, _ in empty]}")
+    for p, n, f in empty:
+        if issues is not None:
+            issues.add(tumour_id(p, n), "skipped", f"no {f.name} in the tumour folder", f)
+        else:
+            log(f"warning: {table}: no {f.name} for {tumour_id(p, n)}")
     return found
 
 
@@ -56,15 +60,17 @@ def dash_sample(col: str = "sample") -> pl.Expr:
 def build_per_tumour(table: str, schema: dict, read_one: Callable[[str, str, Path], pl.DataFrame],
                      sort: tuple[str, ...]) -> pl.DataFrame:
     """Read every discovered tumour with `read_one(patient, n, path)` (frame without the id columns),
-    attach tumour_id / patient_id, check the schema, write the canonical parquet."""
-    files = discover(table)
+    attach tumour_id / patient_id, check the schema, write the canonical parquet. A tumour whose file is
+    missing or can't be read is left out and recorded in data/_issues/<table>.tsv."""
+    issues = Issues(table)
+    files = discover(table, issues)
     frames = []
     for p, n, f in files:
         try:
             frames.append(read_one(p, n, f).with_columns(pl.lit(tumour_id(p, n)).alias("tumour_id"),
                                                          pl.lit(p).alias("patient_id")))
         except Exception as e:
-            raise ValueError(f"{table}: failed reading {f}: {e}") from e
+            issues.add(tumour_id(p, n), "skipped", f"unreadable: {type(e).__name__}: {e}", f)
     log(f"{table}: read {len(frames)} WES tumours")
     if frames:
         df = pl.concat(frames, how="diagonal_relaxed").select([pl.col(c).cast(t) for c, t in schema.items()])
@@ -74,4 +80,5 @@ def build_per_tumour(table: str, schema: dict, read_one: Callable[[str, str, Pat
     out = canonical_output_path(table)
     df.write_parquet(out)
     log(f"wrote {out} ({df.height} rows × {df.width} cols)")
+    issues.write()
     return df

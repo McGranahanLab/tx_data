@@ -70,10 +70,14 @@ TABLES = (
     # trees (ALPACA input), cohort facts, chromosome lengths (2026-11-19)
     "alpaca_trees",
     "wgs_alpaca_trees",
+    # single-sample / single-clone tumours per cohort (Piotr, 2026-11-25); after the cp_table and CONIPHER
+    # tables they count from, before cohort_metadata, which summarises them
+    "sample_clone_counts",
+    "wgs_sample_clone_counts",
     "cohort_metadata",
     # chr_table emits TWO parquets (chr_table_hg19, chr_table_hg38)
     "chr_table",
-    # WGD_WGS_pipeline output; location from TX_WGS_WGD_CALLS_DIR (else the mock)
+    # WGD_pipeline WGS output (run the pipeline first); location from TX_WGS_WGD_CALLS_DIR (else the mock)
     "wgs_wgd_calls",
 )
 
@@ -147,6 +151,18 @@ def _missing_outputs(data_dir: Path, name: str) -> list[str]:
     ]
 
 
+def _combined_issues(data_dir: Path, failures: dict[str, dict[str, str]]) -> pl.DataFrame:
+    """Per-tumour issues (skipped / partial / warning) of the tables built this run -> data/build_issues.tsv."""
+    from tx_data.builds._base import ISSUE_COLS, ISSUES_DIR
+
+    frames = [pl.read_csv(ISSUES_DIR / f"{n}.tsv", separator="\t", infer_schema_length=0)
+              for n in TABLES if n not in failures and (ISSUES_DIR / f"{n}.tsv").is_file()]
+    df = (pl.concat(frames, how="diagonal_relaxed") if frames
+          else pl.DataFrame(schema={c: pl.String for c in ISSUE_COLS})).fill_null("")
+    df.write_csv(data_dir / "build_issues.tsv", separator="\t")
+    return df
+
+
 def _write_report(
     data_dir: Path,
     manifest: dict,
@@ -191,6 +207,19 @@ def _write_report(
             lines.append(f"  - {name}: {f['error_type']}: {f['message']}")
             for tb_line in f["traceback"].rstrip().splitlines():
                 lines.append(f"      {tb_line}")
+
+    issues = _combined_issues(data_dir, failures)
+    lines.append("")
+    if issues.height:
+        lines.append(f"Tumour issues ({issues.height}; full list in {data_dir / 'build_issues.tsv'}):")
+        for (table, sev), g in issues.group_by("table", "severity", maintain_order=True):
+            lines.append(f"  {table:<28} {sev:<8} {g.height:>4}: " + ", ".join(g["tumour_id"].head(10).to_list())
+                         + (" ..." if g.height > 10 else ""))
+        lines.append("  By reason:")
+        for (reason,), g in issues.group_by("reason", maintain_order=True):
+            lines.append(f"    {g.height:>4}  {reason[:140]}")
+    else:
+        lines.append("Tumour issues: none")
 
     report_path = data_dir / "_build_report.txt"
     report_path.write_text("\n".join(lines) + "\n")

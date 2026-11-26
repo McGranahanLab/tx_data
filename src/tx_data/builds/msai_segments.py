@@ -23,7 +23,7 @@ from pathlib import Path
 
 import polars as pl
 
-from tx_data.builds._base import canonical_output_path, log
+from tx_data.builds._base import Issues, canonical_output_path, log
 from tx_data.builds._wes_release_files import dash_sample
 from tx_data.builds._wgs_tumour_files import r_int
 from tx_data.normalize import canonical_chr_expr
@@ -43,7 +43,7 @@ def log_alpaca_links(input_root: Path) -> None:
         log(f"{TABLE}: {d} is a {kind} (resolves to {d.resolve()})")
 
 
-def discover() -> list[tuple[str, Path]]:
+def discover(issues: Issues | None = None) -> list[tuple[str, Path]]:
     probe = resolve_source(TABLE, tumour_id="__probe__")
     root = probe.parent.parent                          # ALPACA/input/
     if not root.is_dir():
@@ -52,8 +52,11 @@ def discover() -> list[tuple[str, Path]]:
     log_alpaca_links(root)
     found = [(d.name, d / probe.name) for d in sorted(root.iterdir()) if d.is_dir() and (d / probe.name).is_file()]
     missing = [d.name for d in sorted(root.iterdir()) if d.is_dir() and not (d / probe.name).is_file()]
-    if missing:
-        log(f"warning: {TABLE}: no {probe.name} for {len(missing)} tumour(s): {missing}")
+    for t in missing:
+        if issues is not None:
+            issues.add(t, "skipped", f"ALPACA input folder has no {probe.name}", root / t / probe.name)
+        else:
+            log(f"warning: {TABLE}: no {probe.name} for {t}")
     return found
 
 
@@ -80,13 +83,14 @@ def read_one(tumour_id: str, path: Path) -> pl.DataFrame:
 
 
 def build() -> pl.DataFrame:
-    files = discover()
+    issues = Issues(TABLE)
+    files = discover(issues)
     frames = []
     for t, f in files:
         try:
             frames.append(read_one(t, f))
         except Exception as e:
-            raise ValueError(f"{TABLE}: failed reading {f}: {e}") from e
+            issues.add(t, "skipped", f"unreadable: {type(e).__name__}: {e}", f)
     log(f"{TABLE}: read {len(frames)} WES tumours")
     df = (pl.concat(frames, how="diagonal_relaxed").select([pl.col(c).cast(t) for c, t in SCHEMA.items()])
           if frames else pl.DataFrame(schema=SCHEMA))
@@ -94,6 +98,7 @@ def build() -> pl.DataFrame:
     out = canonical_output_path(TABLE)
     df.write_parquet(out)
     log(f"wrote {out} ({df.height} rows × {df.width} cols)")
+    issues.write()
     return df
 
 

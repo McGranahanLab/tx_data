@@ -22,7 +22,7 @@ from pathlib import Path
 
 import polars as pl
 
-from tx_data.builds._base import canonical_output_path, log
+from tx_data.builds._base import Issues, canonical_output_path, log
 from tx_data.builds._wes_release_files import dash_sample, discover, tumour_id
 from tx_data.builds._wgs_tumour_files import r_int, read_tsv, require
 from tx_data.normalize import canonical_chr_expr
@@ -83,31 +83,39 @@ def read_one(patient: str, n: str, path: Path) -> pl.DataFrame:
 
 
 def build() -> pl.DataFrame:
-    files = discover(TABLE)
+    issues = Issues(TABLE)
+    files = discover(TABLE, issues)
     known = _known_samples()
-    frames, no_tree = [], []
+    frames = []
     for patient, n, path in files:
-        if not resolve_source(TABLE, pattern_key=TREE_TABLE_PATTERN, patient_id=patient, tumour_n=n).is_file():
-            no_tree.append(f"{patient}_{n}")
+        tid = tumour_id(patient, n)
+        tt = resolve_source(TABLE, pattern_key=TREE_TABLE_PATTERN, patient_id=patient, tumour_n=n)
         try:
             frames.append(read_one(patient, n, path))
         except Exception as e:
-            raise ValueError(f"{TABLE}: failed reading {path}: {e}") from e
+            issues.add(tid, "skipped", f"unreadable: {type(e).__name__}: {e}", path)
+            continue
+        if not tt.is_file():
+            issues.add(tid, "partial", "no treeTable.tsv: tree_cluster null for the whole tumour", tt)
     log(f"{TABLE}: read {len(frames)} WES tumours")
-    if no_tree:
-        log(f"warning: {TABLE}: no treeTable.tsv for {len(no_tree)} tumour(s), tree_cluster null: {no_tree}")
     if frames:
         df = pl.concat(frames, how="diagonal_relaxed").select([pl.col(c).cast(t) for c, t in SCHEMA.items()])
     else:
         df = pl.DataFrame(schema=SCHEMA)
     if known is not None and df.height:
-        unknown = sorted(set(df.select("tumour_id", "sample").unique().iter_rows()) - known)
-        if unknown:
-            log(f"warning: {TABLE}: {len(unknown)} (tumour, sample) not in clone_proportions: {unknown[:10]}")
+        cp_tumours = {t for t, _ in known}
+        for (tid,), g in df.group_by("tumour_id"):
+            if tid not in cp_tumours:
+                issues.add(tid, "warning", "tumour not in clone_proportions (no ALPACA cp_table)")
+                continue
+            extra = sorted(set(g["sample"]) - {s for t, s in known if t == tid})
+            if extra:
+                issues.add(tid, "warning", f"samples not in clone_proportions: {extra}")
     df = df.sort("tumour_id", "sample", "chr", "pos", nulls_last=True)
     out = canonical_output_path(TABLE)
     df.write_parquet(out)
     log(f"wrote {out} ({df.height} rows × {df.width} cols)")
+    issues.write()
     return df
 
 

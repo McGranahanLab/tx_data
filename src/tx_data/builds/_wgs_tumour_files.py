@@ -14,7 +14,7 @@ from pathlib import Path
 import polars as pl
 
 from tx_data import wgs_samples
-from tx_data.builds._base import canonical_output_path, log
+from tx_data.builds._base import Issues, canonical_output_path, log
 from tx_data.sources import resolve_source
 
 ID_COLS = {"tumour_id": pl.String, "patient_id": pl.String, "wgs_tumour_label": pl.String}
@@ -26,16 +26,19 @@ def build_per_tumour(table: str, schema: dict, read_one: Callable[[str, Path], p
     attach tumour_id / patient_id / label, check the schema, write the canonical parquet."""
     wgs_samples.clear_cache()
     tumours = wgs_samples.tumours()
-    frames, absent = [], []
+    issues = Issues(table)
+    tid = dict(tumours.select("wgs_tumour_label", "tumour_id").iter_rows())
+    frames = []
     for label in tumours["wgs_tumour_label"].to_list():
         path = resolve_source(table, wgs_tumour_label=label)
         if not path.is_file():
-            absent.append(label)
+            issues.add(tid[label], "skipped", f"no {path.name} for WGS label {label}", path)
             continue
-        frames.append(read_one(label, path).with_columns(pl.lit(label).alias("wgs_tumour_label")))
+        try:
+            frames.append(read_one(label, path).with_columns(pl.lit(label).alias("wgs_tumour_label")))
+        except Exception as e:
+            issues.add(tid[label], "skipped", f"unreadable: {type(e).__name__}: {e}", path)
     log(f"{table}: read {len(frames)}/{tumours.height} WGS tumours")
-    if absent:
-        log(f"warning: {table}: no file for {len(absent)} tumour(s): {absent}")
     if frames:
         df = (pl.concat(frames, how="diagonal_relaxed")
                 .join(tumours, on="wgs_tumour_label", how="left")
@@ -46,6 +49,7 @@ def build_per_tumour(table: str, schema: dict, read_one: Callable[[str, Path], p
     out = canonical_output_path(table)
     df.write_parquet(out)
     log(f"wrote {out} ({df.height} rows × {df.width} cols)")
+    issues.write()
     return df
 
 
