@@ -1,0 +1,93 @@
+# Catalog: wgs_alpaca_wgd_ratios_corrected (WGS). Added 2026-11-26.
+name: wgs_alpaca_wgd_ratios_corrected
+cohort: wgs
+description: 'WGS counterpart of `alpaca_wgd_ratios_corrected` (same columns), from darwins_analysis WGD_pipeline run
+  with config.wgs.toml (correct step). Separate from the WES table so the two corrections don''t overwrite each other
+  (Piotr, 2026-11-26). WES description: `alpaca_wgd_ratios` recomputed from `alpaca_corrected` (ALPACA''s `calculate_wgd_ratios`,
+  ported; matches ALPACA to 1e-9 on uncorrected data). After the correction, parallel GDs that ALPACA had moved onto
+  an absent parent show on the doubled children (ratio ~2) and no longer on the parent. One row per (tumour × clone)
+  for the tumours the correction ran on.'
+provenance:
+  cohort: TRACERx 842 (Tx842)
+  hpc_source: /nemo/project/proj-tracerx-lung/tctProjects/CN-CCF/wgs_resources/alpaca/output/post_hoc_corrected/wgd_ratios_corrected.tsv
+  hpc_source_status: 'Mock layout only. The real location is a build parameter: --source-dir <darwins_analysis>/WGD_pipeline/output/wgs/correction
+    or TX_WGS_ALPACA_CORRECTED_DIR.'
+  format_on_source: tab-separated, header row, NA for null
+  received: '2026-11-26'
+  received_via: darwins_analysis WGD_pipeline config.wgs.toml (correct step)
+  canonical_format: Parquet (after build script)
+  pipeline: As alpaca_wgd_ratios (see its catalog), on alpaca_corrected.
+primary_key:
+- tumour_id
+- clone
+grain: one row per (tumour × clone on the ALPACA tree)
+genome_build: hg38
+joins:
+  alpaca_wgd_ratios:
+    true:
+    - alpaca_wgd_ratios_corrected.tumour_id = alpaca_wgd_ratios.tumour_id
+    - alpaca_wgd_ratios_corrected.clone = alpaca_wgd_ratios.clone
+    notes: Same clones; the ratios differ only for corrected clones and their children.
+  alpaca_corrected:
+    true:
+    - alpaca_wgd_ratios_corrected.tumour_id = alpaca_corrected.tumour_id
+    - alpaca_wgd_ratios_corrected.clone = alpaca_corrected.clone
+derived_columns:
+- name: is_mrca
+  description: parent == 'diploid'.
+  rule: parent == 'diploid'
+columns:
+- name: tumour_id
+  type: VARCHAR
+  description: Canonical tumour ID.
+  null_semantics: not_applicable
+- name: clone
+  type: VARCHAR
+  description: Clone ID.
+  null_semantics: not_applicable
+- name: parent
+  type: VARCHAR
+  description: Parent clone; diploid for the MRCA.
+  null_semantics: not_applicable
+- name: ratio_A
+  type: DOUBLE
+  description: As alpaca_wgd_ratios.ratio_A, on corrected CN.
+  null_semantics: not_applicable
+- name: ratio_B
+  type: DOUBLE
+  description: As alpaca_wgd_ratios.ratio_B, on corrected CN.
+  null_semantics: not_applicable
+- name: ratio_total
+  type: DOUBLE
+  description: As alpaca_wgd_ratios.ratio_total, on corrected CN.
+  null_semantics: not_applicable
+- name: segments_used_A
+  type: BIGINT
+  description: Segments in the ratio_A average.
+  null_semantics: not_applicable
+- name: segments_used_B
+  type: BIGINT
+  description: Segments in the ratio_B average.
+  null_semantics: not_applicable
+- name: segments_used_total
+  type: BIGINT
+  description: Segments in the ratio_total average.
+  null_semantics: not_applicable
+- name: weight_sum_A
+  type: DOUBLE
+  description: Sum of segment lengths (bp) in ratio_A.
+  null_semantics: not_applicable
+- name: weight_sum_B
+  type: DOUBLE
+  description: Sum of segment lengths (bp) in ratio_B.
+  null_semantics: not_applicable
+- name: weight_sum_total
+  type: DOUBLE
+  description: Sum of segment lengths (bp) in ratio_total.
+  null_semantics: not_applicable
+- name: is_mrca
+  type: BOOLEAN
+  description: parent == 'diploid'.
+  null_semantics: not_applicable
+  derived: true
+open_questions: []

@@ -666,6 +666,29 @@ sources:
     received_via: downloaded from https://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/hg38.chrom.sizes
     notes: |
       UCSC chrom.sizes (chrom, length), all contigs; the build keeps 1-22, X, Y.
+  wgs_alpaca_corrected:
+    cohort: wgs
+    # Mock layout only. The real location is a build parameter: TX_WGS_ALPACA_CORRECTED_DIR or
+    # scripts/build_wgs_alpaca_corrected.py --source-dir <darwins_analysis>/WGD_pipeline/output/wgs/correction.
+    relative_path: alpaca/output/post_hoc_corrected/alpaca_corrected.parquet
+    format: parquet
+    received: 2026-11-26
+    received_via: darwins_analysis WGD_pipeline config.wgs.toml, correct step (Piotr, 2026-11-26)
+    notes: |
+      WGS counterpart of alpaca_corrected: `wgs_alpaca` with the copy number of missing clones re-inferred
+      from the WGS WGD calls. Separate tables so loading the WGS correction doesn't overwrite the WES one.
+
+  wgs_alpaca_wgd_ratios_corrected:
+    cohort: wgs
+    # Mock layout only; real location = build parameter (see wgs_alpaca_corrected).
+    relative_path: alpaca/output/post_hoc_corrected/wgd_ratios_corrected.tsv
+    format: tsv
+    header: true
+    received: 2026-11-26
+    received_via: darwins_analysis WGD_pipeline config.wgs.toml, correct step (Piotr, 2026-11-26)
+    notes: |
+      WGS counterpart of alpaca_wgd_ratios_corrected: ALPACA's WGD ratios recomputed from wgs_alpaca_corrected.
+
   wgs_wgd_calls:
     cohort: wgs
     # Mock layout only: nothing is written to this folder on Nemo (WGD_WGS_pipeline is the old pipeline name).

@@ -113,4 +113,5 @@ BUILDERS = {
     "cohort_metadata": cohort_metadata.build,
     "chr_table": chr_table.build,
     "wgs_wgd_calls": wgs_wgd_calls.build,
+    "wgs_alpaca_corrected": alpaca_corrected.build_wgs,
 }

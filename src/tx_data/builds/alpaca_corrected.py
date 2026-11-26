@@ -8,7 +8,9 @@ ALPACA's copy number (`pred_CN_*_original`).
 Where the correction output lives is a build parameter (Piotr, 2026-11-13: nothing hardcoded):
 `build(source_dir=...)`, `scripts/build_alpaca_corrected.py --source-dir <dir>`, or the
 environment variable TX_ALPACA_CORRECTED_DIR (used by build_all). The directory holds
-`alpaca_corrected.parquet` and `wgd_ratios_corrected.tsv` as written by the correction's `--out`.
+`alpaca_corrected.parquet` and `wgd_ratios_corrected.tsv` as written by the correction's `--out`
+(WGD_pipeline: `<out_dir>/correction`). WGS has its own pair, `wgs_alpaca_corrected` /
+`wgs_alpaca_wgd_ratios_corrected` (`build_wgs`, TX_WGS_ALPACA_CORRECTED_DIR).
 Without one, the `_sources.yml` entries are used, which point at the mock layout in nemo_mock/.
 """
 
@@ -68,23 +70,39 @@ def read_ratios(path) -> pl.DataFrame:
 ENV_DIR = "TX_ALPACA_CORRECTED_DIR"
 
 
-def _sources(source_dir: Path | None) -> tuple[Path, Path]:
-    d = source_dir or (Path(os.environ[ENV_DIR]) if os.environ.get(ENV_DIR) else None)
+def _sources(source_dir: Path | None, table: str = TABLE, ratios: str = RATIOS,
+             env_dir: str = ENV_DIR) -> tuple[Path, Path]:
+    d = source_dir or (Path(os.environ[env_dir]) if os.environ.get(env_dir) else None)
     if d is not None:
         return Path(d) / "alpaca_corrected.parquet", Path(d) / "wgd_ratios_corrected.tsv"
-    return resolve_source(TABLE), resolve_source(RATIOS)
+    return resolve_source(table), resolve_source(ratios)
 
 
 def build(source_dir: Path | None = None) -> pl.DataFrame:
-    src, rsrc = _sources(source_dir)
+    """WES: alpaca_corrected + alpaca_wgd_ratios_corrected (TX_ALPACA_CORRECTED_DIR)."""
+    return build_tables(*_sources(source_dir), TABLE, RATIOS)
+
+
+WGS_TABLE, WGS_RATIOS, WGS_ENV_DIR = "wgs_alpaca_corrected", "wgs_alpaca_wgd_ratios_corrected", \
+    "TX_WGS_ALPACA_CORRECTED_DIR"
+
+
+def build_wgs(source_dir: Path | None = None) -> pl.DataFrame:
+    """WGS: wgs_alpaca_corrected + wgs_alpaca_wgd_ratios_corrected (TX_WGS_ALPACA_CORRECTED_DIR; Piotr,
+    2026-11-26: separate tables so the WGS correction doesn't overwrite the WES one)."""
+    return build_tables(*_sources(source_dir, WGS_TABLE, WGS_RATIOS, WGS_ENV_DIR), WGS_TABLE, WGS_RATIOS)
+
+
+def build_tables(src: Path, rsrc: Path, table: str, ratios: str) -> pl.DataFrame:
+    """The correction's --out files (`alpaca_corrected.parquet`, `wgd_ratios_corrected.tsv`) -> two tables."""
     log(f"read {src}")
     df = read_corrected(src)
-    out = canonical_output_path(TABLE)
+    out = canonical_output_path(table)
     df.write_parquet(out)
     log(f"wrote {out} ({df.height} rows × {df.width} cols; {int(df['corrected'].sum())} corrected)")
     log(f"read {rsrc}")
     r = read_ratios(rsrc)
-    rout = canonical_output_path(RATIOS)
+    rout = canonical_output_path(ratios)
     r.write_parquet(rout)
     log(f"wrote {rout} ({r.height} rows × {r.width} cols)")
     return df
