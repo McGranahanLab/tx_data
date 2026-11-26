@@ -79,6 +79,8 @@ TABLES = (
     "chr_table",
     # WGD_pipeline WGS output (run the pipeline first); location from TX_WGS_WGD_CALLS_DIR (else the mock)
     "wgs_wgd_calls",
+    # WGD_pipeline WES output (run the pipeline first); location from TX_WES_WGD_CALLS_DIR (else the mock)
+    "wgd_calls_pipeline",
 )
 
 # Extra parquet names a builder may emit in addition to `<table>.parquet`.

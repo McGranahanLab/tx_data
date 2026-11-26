@@ -662,6 +662,22 @@ sources:
     received_via: downloaded from https://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/hg38.chrom.sizes
     notes: |
       UCSC chrom.sizes (chrom, length), all contigs; the build keeps 1-22, X, Y.
+  wgd_calls_pipeline:
+    cohort: wes
+    # Mock layout only: nothing is written to this folder on Nemo. The real location is a build parameter
+    # (as for wgs_wgd_calls): TX_WES_WGD_CALLS_DIR or --source-dir
+    # <darwins_analysis>/WGD_pipeline/output/wes/wgd/05_table (src/tx_data/builds/wgd_calls_pipeline.py).
+    relative_path: WGD/WGD_pipeline/05_table/wgd_calls.tsv
+    format: tsv
+    header: true
+    received: 2026-11-26
+    received_via: darwins_analysis WGD_pipeline, config.wes.toml (Piotr, 2026-11-26)
+    notes: |
+      Step 05 wgd_calls.tsv of the WES run of WGD_pipeline: every call (quality_pass marks the ones passing
+      the quality cut-off), QC columns, qc_failed / no_alpaca_tree rows with NA calls. Tumours the pipeline
+      left out are in the run's failed_tumours.tsv, not here. The mock is the pipeline's run on this repo's
+      WES mock cohort (config.wes.sandbox.toml, 2026-11-26).
+
   wgs_wgd_calls:
     cohort: wgs
     # Mock layout only: nothing is written to this folder on Nemo (WGD_WGS_pipeline is the old pipeline name).

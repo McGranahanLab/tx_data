@@ -22,6 +22,7 @@ from tx_data.builds import (
     sample_clone_counts,
     seeding_table,
     wgd_calls,
+    wgd_calls_pipeline,
     wgs_battenberg_inventory,
     wgs_clone_proportions,
     wgs_consensus_segments,
@@ -41,6 +42,7 @@ from tx_data.builds import (
 __all__ = [
     "muttable",
     "wgd_calls",
+    "wgd_calls_pipeline",
     "alphamissense",
     "clinical",
     "driver_list",
@@ -79,6 +81,7 @@ __all__ = [
 BUILDERS = {
     "muttable": muttable.build,
     "wgd_calls": wgd_calls.build,
+    "wgd_calls_pipeline": wgd_calls_pipeline.build,
     "alphamissense": alphamissense.build,
     "clinical": clinical.build,
     "driver_list": driver_list.build,
