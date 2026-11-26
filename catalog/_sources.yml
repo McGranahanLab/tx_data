@@ -87,15 +87,19 @@ sources:
 
   wgd_calls:
     cohort: wes
-    relative_path: WGD/release_tx842/WGD_calls.tsv
+    # Mock layout only: nothing is written to this folder on Nemo. The real location is a build parameter
+    # (as for wgs_wgd_calls): TX_WES_WGD_CALLS_DIR or --source-dir
+    # <darwins_analysis>/WGD_pipeline/output/wes/wgd/05_table (src/tx_data/builds/wgd_calls.py).
+    relative_path: WGD/WGD_pipeline/05_table/wgd_calls.tsv
     format: tsv
     header: true
-    received: 2026-08-31
+    received: 2026-11-26
+    received_via: darwins_analysis WGD_pipeline, config.wes.toml; replaces the previous release WGD/release_tx842/WGD_calls.tsv (Piotr, 2026-11-26)
     notes: |
-      Per-clone WGD assignments AND the tumour tree in one file — satisfies
-      both the "PGDD output" and "phylogenetic tree" requirements.
-      Uses tumour_id spelling `LTX0001-Tumour1` (differs from muttable's
-      `LTX0001_tumour1`); loader normalises.
+      Step 05 wgd_calls.tsv of the WES run of WGD_pipeline: every call (quality_pass marks the ones passing
+      the quality cut-off), QC columns, qc_failed / no_alpaca_tree rows with NA calls. Tumours the pipeline
+      left out are in the run's failed_tumours.tsv, not here. The mock is the pipeline's run on this repo's
+      WES mock cohort (config.wes.sandbox.toml, 2026-11-26).
 
   alphamissense:
     cohort: wes

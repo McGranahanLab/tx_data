@@ -28,7 +28,7 @@ from tx_data.paths import build_root_for_mode
 TABLES = (
     "muttable",
     "clinical",
-    "wgd_calls",
+    "wgd_calls",              # WGD_pipeline WES output (run the pipeline first); TX_WES_WGD_CALLS_DIR (else the mock)
     "alphamissense",
     "driver_list",
     "alpaca",

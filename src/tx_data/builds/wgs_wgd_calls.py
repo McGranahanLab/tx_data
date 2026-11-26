@@ -40,21 +40,21 @@ DERIVED = {"is_root": pl.Boolean, "is_wgd_event_clone": pl.Boolean, "cumulative_
 SCHEMA = {**SOURCE_SCHEMA, **DERIVED}
 
 
-def _source(source_dir: Path | None) -> Path:
-    d = source_dir or (Path(os.environ[ENV_DIR]) if os.environ.get(ENV_DIR) else None)
+def _source(source_dir: Path | None, table: str = TABLE, env_dir: str = ENV_DIR, cohort: str = "wgs") -> Path:
+    d = source_dir or (Path(os.environ[env_dir]) if os.environ.get(env_dir) else None)
     if d is not None:
         return Path(d) / "wgd_calls.tsv"
-    p = resolve_source(TABLE)              # mock layout only
+    p = resolve_source(table)              # mock layout only
     if not p.is_file():
         raise FileNotFoundError(
-            f"{TABLE}: no pipeline output given and the mock-layout default {p} does not exist. Point the build at "
-            f"the WGS run of darwins_analysis WGD_pipeline: {ENV_DIR}=<darwins_analysis>/WGD_pipeline/<[run].out_dir "
-            f"of config.wgs.toml, default output/wgs>/wgd/05_table (or --source-dir). Run the pipeline first: it "
-            f"reads the tx_data WGS tables, so this table is built after it.")
+            f"{table}: no pipeline output given and the mock-layout default {p} does not exist. Point the build at "
+            f"the {cohort.upper()} run of darwins_analysis WGD_pipeline: {env_dir}=<darwins_analysis>/WGD_pipeline/"
+            f"<[run].out_dir of config.{cohort}.toml, default output/{cohort}>/wgd/05_table (or --source-dir). Run the "
+            f"pipeline first: it reads the tx_data {cohort.upper()} tables, so this table is built after it.")
     return p
 
 
-def read_calls(path: Path) -> pl.DataFrame:
+def read_calls(path: Path, table: str = TABLE) -> pl.DataFrame:
     df = pl.read_csv(path, separator="\t", null_values=["NA", ""], infer_schema_length=None,
                      schema_overrides={c: t for c, t in SOURCE_SCHEMA.items() if t == pl.String})
     missing = [c for c in SOURCE_SCHEMA if c not in df.columns]
@@ -63,14 +63,18 @@ def read_calls(path: Path) -> pl.DataFrame:
     df = df.select(pl.col(c).cast(t, strict=True) for c, t in SOURCE_SCHEMA.items())
     dup = df.filter(pl.col("clone").is_not_null() & pl.struct("tumour_id", "clone").is_duplicated())
     if dup.height:
-        raise ValueError(f"{TABLE}: duplicate (tumour_id, clone):\n{dup.head()}")
+        raise ValueError(f"{table}: duplicate (tumour_id, clone):\n{dup.head()}")
     return df
 
 
 def build(source_dir: Path | None = None) -> pl.DataFrame:
-    src = _source(source_dir)
+    return build_table(TABLE, _source(source_dir))
+
+
+def build_table(table: str, src: Path) -> pl.DataFrame:
+    """Step 05 wgd_calls.tsv of a WGD_pipeline run -> canonical Parquet `table` (WGS or WES)."""
     log(f"read {src}")
-    df = read_calls(src)
+    df = read_calls(src, table)
     calls = df.filter(~pl.col("status").is_in(list(NO_CALLS)) & pl.col("clone").is_not_null())
     rest = df.join(calls.select("tumour_id", "clone"), on=["tumour_id", "clone"], how="anti", nulls_equal=True)
     df = (pl.concat([add_derived(calls) if calls.height else calls.with_columns(
@@ -81,7 +85,7 @@ def build(source_dir: Path | None = None) -> pl.DataFrame:
             .sort("tumour_id", "clone", nulls_last=True))
     log(f"{df['tumour_id'].n_unique()} tumours; status: "
         + ", ".join(f"{s}={n}" for s, n in df.unique("tumour_id").group_by("status").len().sort("status").iter_rows()))
-    out = canonical_output_path(TABLE)
+    out = canonical_output_path(table)
     df.write_parquet(out)
     log(f"wrote {out} ({df.height} rows × {df.width} cols)")
     return df
