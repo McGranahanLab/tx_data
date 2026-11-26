@@ -1,6 +1,13 @@
-"""Build wgd_calls → canonical Parquet.
+"""Build wgd_calls (WES) → canonical Parquet.
 
-Adds derived columns:
+Since 2026-11-26 (Piotr) the WES calls come only from darwins_analysis `WGD_pipeline` run with
+`config.wes.toml`: step 05 `wgd_calls.tsv`, read by the same code as `wgs_wgd_calls` (same columns). The
+previous release table (`WGD/release_tx842/WGD_calls.tsv`) is no longer a tx_data source. Where the
+pipeline output lives is a build parameter: `build(source_dir=...)`,
+`scripts/build_wgd_calls.py --source-dir <darwins_analysis>/WGD_pipeline/output/wes/wgd/05_table`, or
+TX_WES_WGD_CALLS_DIR (used by build_all); without one, the mock layout in nemo_mock/.
+
+Derived columns (`add_derived`, also used by wgs_wgd_calls):
   - `is_root`: `parent == 'diploid'`
   - `is_wgd_event_clone`: `number_of_gds_at_clone > 0`
   - `cumulative_gds_to_clone`: sum along parent chain to MRCA (inclusive)
@@ -15,8 +22,6 @@ from __future__ import annotations
 
 import polars as pl
 
-from tx_data.builds._base import canonical_output_path, log
-from tx_data.sources import resolve_source
 
 TABLE = "wgd_calls"
 
@@ -74,28 +79,14 @@ def add_derived(df: pl.DataFrame) -> pl.DataFrame:
     return df
 
 
-def build() -> pl.DataFrame:
-    src = resolve_source(TABLE)
-    log(f"read {src}")
+ENV_DIR = "TX_WES_WGD_CALLS_DIR"
 
-    df = pl.read_csv(
-        src, separator="\t", null_values=["NA", "", "nan"], infer_schema_length=10000
-    )
 
-    # Ensure integer types where the catalog says so.
-    df = df.with_columns(
-        [
-            pl.col("number_of_gds_at_clone").cast(pl.Int64),
-            pl.col("total_gds_per_tumour").cast(pl.Int64),
-        ]
-    )
+def build(source_dir=None) -> pl.DataFrame:
+    """WES calls = step 05 wgd_calls.tsv of WGD_pipeline (config.wes.toml); shared reader with wgs_wgd_calls."""
+    from tx_data.builds.wgs_wgd_calls import _source, build_table   # lazy: wgs_wgd_calls imports add_derived
 
-    df = add_derived(df)
-
-    out = canonical_output_path(TABLE)
-    df.write_parquet(out)
-    log(f"wrote {out} ({df.height} rows × {df.width} cols)")
-    return df
+    return build_table(TABLE, _source(source_dir, TABLE, ENV_DIR, "wes"))
 
 
 if __name__ == "__main__":

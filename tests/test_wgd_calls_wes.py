@@ -1,4 +1,4 @@
-"""wgd_calls_pipeline (WGD_pipeline WES output) on the mock, and its source-dir parameter (2026-11-26)."""
+"""wgd_calls (WES) = WGD_pipeline WES output (since 2026-11-26), on the mock, and its source-dir parameter."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import polars as pl
 import pytest
 
 from tx_data import catalog
-from tx_data.builds import wgd_calls_pipeline as w
+from tx_data.builds import wgd_calls as w
 
 
 @pytest.fixture(scope="module")
@@ -19,7 +19,7 @@ def built():
 
 
 def test_columns_match_catalog_and_wgs(built):
-    assert [c["name"] for c in catalog.load_catalog("wgd_calls_pipeline")["columns"]] == built.columns
+    assert [c["name"] for c in catalog.load_catalog("wgd_calls")["columns"]] == built.columns
     assert built.columns == [c["name"] for c in catalog.load_catalog("wgs_wgd_calls")["columns"]]
 
 
@@ -30,7 +30,7 @@ def test_calls_and_derived(built):
 
 
 def test_source_dir_and_env(tmp_path, monkeypatch, built):
-    src = w._source(None, w.TABLE, w.ENV_DIR, "wes")
+    src = __import__("tx_data.builds.wgs_wgd_calls", fromlist=["_source"])._source(None, w.TABLE, w.ENV_DIR, "wes")
     (tmp_path / "wgd_calls.tsv").write_bytes(src.read_bytes())
     monkeypatch.setenv(w.ENV_DIR, str(tmp_path))
     assert w.build().height == built.height

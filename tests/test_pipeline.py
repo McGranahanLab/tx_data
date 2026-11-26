@@ -77,8 +77,8 @@ def test_wgd_calls_class_values():
     df = pl.read_parquet(DATA / "wgd_calls.parquet")
     resolved = df.filter(pl.col("status") == "resolved")
     seen_classes = set(resolved["class"].drop_nulls().unique().to_list())
-    # Mock cohort covers all four class values.
-    assert {"no_wgd", "clonal_wgd", "mut_supported", "ploidy_only"}.issubset(seen_classes)
+    # WGD_pipeline mock run (2026-11-26) covers these class values.
+    assert {"no_wgd", "clonal_wgd", "ploidy_only"}.issubset(seen_classes)
 
 
 def test_alphamissense_dedup():
